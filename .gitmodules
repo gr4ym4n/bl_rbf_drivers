@@ -1,0 +1,12 @@
+[submodule "lib/driver_utils"]
+	path = rbf_drivers/lib/driver_utils
+	url = https://github.com/jamesvsnowden/bl_driver_utils.git
+[submodule "lib/transform_utils"]
+	path = rbf_drivers/lib/transform_utils
+	url = https://github.com/jamesvsnowden/bl_transform_utils.git
+[submodule "lib/rotation_utils"]
+	path = rbf_drivers/lib/rotation_utils
+	url = https://github.com/jamesvsnowden/bl_rotation_utils.git
+[submodule "rbf_drivers/lib/curve_mapping"]
+	path = rbf_drivers/lib/curve_mapping
+	url = https://github.com/jamesvsnowden/bl_curve_mapping.git
