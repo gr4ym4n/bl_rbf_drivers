@@ -10,3 +10,6 @@
 [submodule "rbf_drivers/lib/curve_mapping"]
 	path = rbf_drivers/lib/curve_mapping
 	url = https://github.com/jamesvsnowden/bl_curve_mapping.git
+[submodule "rbf_drivers/lib/symmetry"]
+	path = rbf_drivers/lib/symmetry
+	url = https://github.com/jamesvsnowden/bl_symmetry.git

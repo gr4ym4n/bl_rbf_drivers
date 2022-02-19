@@ -1,6 +1,7 @@
 
-import uuid
-import bpy
+from uuid import uuid4
+from bpy.types import PropertyGroup
+from bpy.props import StringProperty
 
 ID_TYPE_ITEMS = [
     ('OBJECT'     , "Object"  , "", 'OBJECT_DATA',                0),
@@ -40,18 +41,33 @@ LAYER_TYPE_INDEX = {
     item[0]: item[4] for item in LAYER_TYPE_ITEMS
     }
 
+def _get_identifier(pgroup: 'Identifiable') -> str:
+    value = PropertyGroup.get(pgroup, "identifier")
+    if not value:
+        value = uuid4().hex
+        PropertyGroup.__setitem__(pgroup, "identifier", value)
+    return value
+
 class Identifiable:
 
-    def _get_identifier(pgroup: 'Identifiable') -> str:
-        value = bpy.types.PropertyGroup.get(pgroup, "identifier")
-        if not value:
-            value = uuid.uuid4().hex
-            bpy.types.PropertyGroup.__setitem__(pgroup, "identifier", value)
-        return value
-
-    identifier: bpy.props.StringProperty(
+    identifier: StringProperty(
         name="Identifier",
         description="Unique data identifier",
         get=_get_identifier,
         options={'HIDDEN'}
         )
+
+def _get_symmetry_identifier(pgroup: 'Symmetrical') -> str:
+    return pgroup.get("symmetry_identifier", "")
+
+class Symmetrical(Identifiable):
+
+    symmetry_identifier: StringProperty(
+        name="Symmetry Identifier",
+        get=_get_symmetry_identifier,
+        options=set(),
+        )
+
+    @property
+    def has_symmetry_target(self) -> bool:
+        return bool(self.symmetry_identifier)

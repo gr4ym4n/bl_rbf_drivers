@@ -1,7 +1,12 @@
 
+#region Imports
+###################################################################################################
+
+import re
+import sys
+import logging
 from functools import partial
-from re import L
-from typing import Any, Iterator, List, Optional, Tuple, Union, TYPE_CHECKING
+from typing import Any, Iterator, List, Match, Optional, Tuple, Union, TYPE_CHECKING
 from math import floor
 
 from bpy.app import version
@@ -13,18 +18,39 @@ from bpy.props import (BoolProperty,
                        IntProperty,
                        PointerProperty,
                        StringProperty)
-
+from rbf_drivers.lib.symmetry import symmetrical_target
 import rna_prop_ui
 import numpy as np
-from .lib.driver_utils import DriverVariableNameGenerator, driver_ensure, driver_find, driver_remove, driver_variables_clear
-from .lib.rotation_utils import axis_angle_to_euler, axis_angle_to_quaternion, euler_to_axis_angle, euler_to_quaternion, noop, quaternion_to_axis_angle, quaternion_to_euler, quaternion_to_logarithmic_map
+
+from .lib.driver_utils import (DriverVariableNameGenerator,
+                               driver_ensure,
+                               driver_find,
+                               driver_remove,
+                               driver_variables_clear)
+
+from .lib.rotation_utils import (axis_angle_to_euler,
+                                 axis_angle_to_quaternion,
+                                 euler_to_axis_angle,
+                                 euler_to_quaternion,
+                                 quaternion_to_axis_angle,
+                                 quaternion_to_euler,
+                                 quaternion_to_logarithmic_map)
+
 from .pose import RBFDriverPoses
-from .posedata import RBFDriverPoseDataVector
-from .mixins import ID_TYPE_ITEMS, LAYER_TYPE_ITEMS, Identifiable
-from rbf_drivers.lib import rotation_utils
+from .posedata import ACTIVE_POSE_DATA_ROTATION_CONVERSION_LUT, RBFDriverPoseDataVector, ActivePoseData
+from .mixins import ID_TYPE_ITEMS, LAYER_TYPE_ITEMS, Identifiable, Symmetrical
 
 if TYPE_CHECKING:
     from .driver import RBFDriver
+
+#endregion Imports
+
+#region Configuration
+###################################################################################################
+
+log = logging.getLogger("rbf_drivers")
+
+DEBUG = 'DEBUG_MODE' in sys.argv
 
 MAX_PARAMS = 36
 
@@ -67,7 +93,7 @@ OUTPUT_CHANNEL_DEFINITIONS = {
             "name": "z",
             "default": 0.0,
             "data_path": "rotation_quaternion",
-            "array_index": 4
+            "array_index": 3
         }
         ],
     'SCALE': [
@@ -94,10 +120,6 @@ OUTPUT_CHANNEL_DEFINITIONS = {
             "default": 0.0,
             "data_path": 'pose.bones[""].bbone_curveinx',
         },{
-            "name": "bbone_curveiny",
-            "default": 0.0,
-            "data_path": 'pose.bones[""].bbone_curveiny',
-        },{
             "name": "bbone_curveoutz",
             "default": 0.0,
             "data_path": 'pose.bones[""].bbone_curveoutz',
@@ -105,10 +127,6 @@ OUTPUT_CHANNEL_DEFINITIONS = {
             "name": "bbone_curveoutx",
             "default": 0.0,
             "data_path": 'pose.bones[""].bbone_curveoutx',
-        },{
-            "name": "bbone_curveouty",
-            "default": 0.0,
-            "data_path": 'pose.bones[""].bbone_curveouty',
         },{
             "name": "bbone_curveoutz",
             "default": 0.0,
@@ -131,28 +149,28 @@ OUTPUT_CHANNEL_DEFINITIONS = {
             "data_path": 'pose.bones[""].bbone_rollout',
         },{
             "name": "bbone_scaleinx",
-            "default": 0.0,
-            "data_path": f'pose.bones[""].bbone_{"scaleinx" if version[0] < 3 else "scalein[0]"}',
+            "default": 1.0,
+            "data_path": f'pose.bones[""].bbone_scalein[0]',
         },{
             "name": "bbone_scaleiny",
-            "default": 0.0,
-            "data_path": f'pose.bones[""].bbone_{"scaleiny" if version[0] < 3 else "scalein[1]"}',
+            "default": 1.0,
+            "data_path":'pose.bones[""].bbone_scalein[1]',
         },{
             "name": "bbone_scaleinz",
-            "default": 0.0,
-            "data_path": f'pose.bones[""].bbone_{"scaleinz" if version[0] < 3 else "scalein[2]"}',
+            "default": 1.0,
+            "data_path": f'pose.bones[""].bbone_scalein[2]',
         },{
             "name": "bbone_scaleoutx",
-            "default": 0.0,
-            "data_path": f'pose.bones[""].bbone_{"scaleoutx" if version[0] < 3 else "scaleout[0]"}',
+            "default": 1.0,
+            "data_path": f'pose.bones[""].bbone_scaleout[0]',
         },{
             "name": "bbone_scaleouty",
-            "default": 0.0,
-            "data_path": f'pose.bones[""].bbone_{"scaleoutx" if version[0] < 3 else "scaleout[1]"}',
+            "default": 1.0,
+            "data_path": f'pose.bones[""].bbone_scaleout[1]',
         },{
             "name": "bbone_scaleoutz",
-            "default": 0.0,
-            "data_path": f'pose.bones[""].bbone_{"scaleoutx" if version[0] < 3 else "scaleout[2]"}',
+            "default": 1.0,
+            "data_path": f'pose.bones[""].bbone_scaleout[2]',
         }
         ],
     'SHAPE_KEY': [
@@ -178,6 +196,10 @@ OUTPUT_ROTATION_MODE_ITEMS = [
     ]
 
 OUTPUT_ROTATION_MODE_INDEX = {
+    item[4]: item[0] for item in OUTPUT_ROTATION_MODE_ITEMS
+    }
+
+OUTPUT_ROTATION_MODE_TABLE = {
     item[0]: item[4] for item in OUTPUT_ROTATION_MODE_ITEMS
     }
 
@@ -195,6 +217,14 @@ ROTATION_CONVERSION_LUT = {
         'QUATERNION': axis_angle_to_quaternion
         }
     }
+
+#endregion Configuration
+
+#region Data Layer
+###################################################################################################
+
+#region Output Channel Range
+###################################################################################################
 
 class RBFDriverOutputChannelRange(PropertyGroup):
 
@@ -214,37 +244,54 @@ class RBFDriverOutputChannelRange(PropertyGroup):
         self["start"] = start
         self["stop"] = stop
 
+#endregion Output Channel Range
+
+#region Output Channel
+###################################################################################################
 
 def output_channel_bone_target_get(channel: 'RBFDriverOutputChannel') -> str:
-    return channel.get("boen_target", "")
+    return channel.get("bone_target", "")
 
 
 def output_channel_bone_target_set(channel: 'RBFDriverOutputChannel', value: str) -> None:
-    cache = output_channel_bone_target_get(channel)
-    if cache != value:
+    output = channel.output
+
+    if output.type not in {'LOCATION', 'ROTATION', 'SCALE', 'BBONE'}:
         channel["bone_target"] = value
+        return
 
-        output = channel.output
-        if output.type in ('LOCATION', 'ROTATION', 'SCALE'):
+    updating_rot = not output.rotation_mode_is_user_defined and output.type == 'ROTATION'
+    prev_rotmode = ""
+    curr_rotmode = ""
 
-            if output.type == 'ROTATION':
-                prop = f'rotation_{output.rotation_mode.lower()}'
-            else:
-                prop = output.type.lower()
+    output_drivers_remove(output)
 
-            for channel in output.channels:
-                channel["bone_target"] = value
+    if updating_rot:
+        prev_rotmode = output_channel_target_rotation_mode(channel, output)
 
-                if (value
-                    and channel.object is not None
-                    and channel.object.type == 'ARMATURE'
-                    ):
-                    output_channel_data_path_update(channel, f'pose.bones["{value}"].{prop}')
-                else:
-                    output_channel_data_path_update(channel, prop)
+    output_foreach_channel_update_property(output, "bone_target", value)
+    output_foreach_channel_update_datapath(output)
 
-        elif output.type == 'BBONE':
-            pass
+    if updating_rot:
+        curr_rotmode = output_channel_target_rotation_mode(channel, output)
+        if prev_rotmode != curr_rotmode:
+            output_rotdata_update(output, prev_rotmode, curr_rotmode)
+            output_idprops_update(output, output.pose_count)
+
+    output_drivers_update(output)
+
+    if channel.has_symmetry_target:
+        mirror = symmetrical_target(value)
+        output_channel_mirror_property(channel, "bone_target", mirror or value)
+
+
+def data_path_split(path: str) -> Tuple[str, int]:
+    if path.endswith("]"):
+        idx = path.rfind("[")
+        key = path[idx+1:-1]
+        if key.isdigit():
+            return path[:idx], int(key)
+    return path, -1
 
 
 def output_channel_data_path_get(channel: 'RBFDriverOutputChannel') -> str:
@@ -257,94 +304,111 @@ def output_channel_data_path_set(channel: 'RBFDriverOutputChannel', value: str) 
         raise RuntimeError((f'{channel.__class__.__name__}.data_path '
                             f'is not user-editable for this output type'))
     else:
-        output_channel_data_path_update(channel, value)
-
-
-def output_channel_data_path_update(channel: 'RBFDriverOutputChannel', value: str) -> None:
-    cache = output_channel_data_path_get(channel)
-    valid = channel.is_valid
-    if cache != value:
+        output_drivers_remove(output)
         channel["data_path"] = value
-        if channel.enabled:
-            if valid:
-                if channel.is_valid:
-                    animdata = channel.id.animation_data
-                    if animdata:
-                        for fcurve in animdata.drivers:
-                            if fcurve.data_path == cache:
-                                fcurve.data_path = value
-                elif channel.is_property_set("array_index"):
-                    driver_remove(channel.id, cache, channel.array_index)
-                else:
-                    driver_remove(channel.id, cache)
-            elif channel.is_valid:
-                output = channel.output
-                output_drivers_update(output, output.rbf_driver.poses)
+        output_drivers_update(output, output.pose_count)
+
+    if channel.has_symmetry_target:
+        def replace(match: Match):
+            value = match.group()
+            return symmetrical_target(value) or value
+
+        output_channel_mirror_property(channel, "data_path", re.findall(r'\["(.*?)"\]', replace, value))
 
 
 def output_channel_enabled_update_handler(channel: 'RBFDriverOutputChannel', _) -> None:
     output = channel.output
-    output_drivers_update(output, output.rbf_driver.poses)
+    poses = output.rbf_driver.poses
+    output_idprops_update(output, len(poses))
+    output_drivers_remove(output)
+    output_drivers_update(output, poses)
+    output_channel_mirror_property(channel, "enabled")
+
+
+def output_channel_invert_update_handler(channel: 'RBFDriverOutputChannel', _) -> None:
+    if channel.has_symmetry_target:
+        # TODO
+        output_channel_mirror_property(channel, "invert")
 
 
 def output_channel_mute_update_handler(channel: 'RBFDriverOutputChannel', _) -> None:
     if channel.enabled:
         id = channel.id
         if id:
-            if channel.is_property_set("array_index"):
-                fcurve = driver_find(id, channel.data_path, channel.array_index)
+            type = channel.output.type
+
+            if type == 'NONE':
+                path, index = data_path_split(channel.data_path)
             else:
-                fcurve = driver_find(id, channel.data_path)
+                path = channel.data_path
+                index = channel.array_index if type in {'LOCATION', 'ROTATION', 'SCALE'} else -1
+
+            if index >= 0:
+                fcurve = driver_find(id, path, index)
+            else:
+                fcurve = driver_find(id, path)
+
             if fcurve:
                 fcurve.mute = channel.mute
 
+    if channel.has_symmetry_target:
+        output_channel_mirror_property(channel, "mute")
+
+
+def output_channel_id_type_update_handler(channel: 'RBFDriverOutputChannel', _) -> None:
+    output = channel.output
+
+    if output.type != 'NONE':
+        raise RuntimeError((f'{channel} id_type is not editable for outputs of type {output.type}'))
+
+    idtype = channel.id_type
+    object = channel.object__internal__
+
+    if object is not None and object.type != idtype:
+        channel.object = None
+
+    if channel.has_symmetry_target:
+        output_channel_mirror_property(channel, "id_type")
+
 
 def output_channel_object_update_handler(channel: 'RBFDriverOutputChannel', _) -> None:
-    cache = channel.object__internal__
-    value = channel.object
+    object = channel.object
 
-    if cache != value:
-        prev_id = channel.id
-        prev_valid = prev_id is not None and channel.is_valid
-
-        channel.object__internal__ = value
-
-        curr_id = channel.id
-        curr_valid = curr_id is not None and channel.is_valid
-        
+    if object != channel.object__internal__:
         output = channel.output
-        if output.type != 'NONE':
-            for other in output.channels:
-                if other != channel:
-                    other.object__internal__ = value
-                    other.object = value
 
-        if prev_valid and curr_valid:
+        updating_rot = not output.rotation_mode_is_user_defined and output.type == 'ROTATION'
+        prev_rotmode = ""
+        curr_rotmode = ""
+
+        output_drivers_remove(output)
+
+        if updating_rot:
+            prev_rotmode = output_channel_target_rotation_mode(channel, output)
+
+        if output.type == 'NONE':
+            channel.object__internal__ = object
+        else:
             for channel in output.channels:
-                if channel.enabled:
-                    if channel.is_property_set("array_index"):
-                        fcurve = driver_find(prev_id, channel.data_path, channel.array_index)
-                    else:
-                        fcurve = driver_find(prev_id, channel.data_path)
-                    if fcurve:
-                        curr_id.animation_data_create().drivers.from_existing(src_driver=fcurve)
-                        fcurve.id_data.animation_data.drivers.remove(fcurve)
-        elif prev_valid:
-            for channel in output.channels:
-                if channel.enabled:
-                    if channel.is_property_set("array_index"):
-                        driver_remove(prev_id, channel.data_path, channel.array_index)
-                    else:
-                        driver_remove(prev_id, channel.data_path)
-        elif curr_valid:
-            output_drivers_update(output, output.rbf_driver.poses)
+                channel.object__internal__ = object
+                channel.object = object
+
+        if updating_rot:
+            curr_rotmode = output_channel_target_rotation_mode(channel, output)
+            if prev_rotmode != curr_rotmode:
+                output_idprops_remove(output)
+                output_rotdata_update(output, prev_rotmode, curr_rotmode)
+                output["rotation_mode"] = OUTPUT_ROTATION_MODE_TABLE[curr_rotmode]
+                output_foreach_channel_update_datapath(output)
+                output_idprops_update(output, output.pose_count)
+
+        output_drivers_update(output, output.rbf_driver.poses)
+
+        if channel.has_symmetry_target:
+            output_channel_mirror_property(channel, "object")
 
 
-            
-
-
-
-class RBFDriverOutputChannel(Identifiable, PropertyGroup):
+class RBFDriverOutputChannel(Symmetrical, PropertyGroup):
 
     array_index: IntProperty(
         name='Index',
@@ -393,7 +457,7 @@ class RBFDriverOutputChannel(Identifiable, PropertyGroup):
         items=ID_TYPE_ITEMS,
         default='OBJECT',
         options=set(),
-        update=lambda self, _: self.update("id_type"),
+        update=output_channel_id_type_update_handler
         )
 
     @property
@@ -401,6 +465,14 @@ class RBFDriverOutputChannel(Identifiable, PropertyGroup):
         object = self.object__internal__
         if object is None or self.id_type == 'OBJECT': return object
         if object.type == self.id_type: return object.data
+
+    invert: BoolProperty(
+        name="Invert",
+        description="Invert the output channel's value when mirroring",
+        default=False,
+        options=set(),
+        update=output_channel_invert_update_handler
+        )
 
     @property
     def is_valid(self) -> bool:
@@ -491,6 +563,12 @@ class RBFDriverOutputChannel(Identifiable, PropertyGroup):
                         return float(value)
         return 0.0
 
+
+#endregion Output Channel
+
+#region Output Channels
+###################################################################################################
+
 class RBFDriverOutputChannels(PropertyGroup):
 
     collection__internal__: CollectionProperty(
@@ -507,6 +585,74 @@ class RBFDriverOutputChannels(PropertyGroup):
     def __getitem__(self, key: Union[str, int, slice]) -> Union[RBFDriverOutputChannel, List[RBFDriverOutputChannel]]:
         return self.collection__internal__[key]
 
+    def find(self, name: str) -> int:
+        return self.collection__internal__.find(name)
+
+    def get(self, name: str) -> Optional[RBFDriverOutputChannel]:
+        return self.collection__internal__.get(name)
+
+    def keys(self) -> Iterator[str]:
+        return self.collection__internal__.keys()
+
+    def items(self) -> Iterator[Tuple[str, RBFDriverOutputChannel]]:
+        return self.collection__internal__.items()
+
+    def search(self, identifier: str) -> Optional[RBFDriverOutputChannel]:
+        return next((channel for channel in self if channel.identifier == identifier), None)
+
+    def values(self) -> Iterator[RBFDriverOutputChannel]:
+        return iter(self)
+
+#endregion Output Channels
+
+#region Output Active Pose Data
+###################################################################################################
+
+class RBFDriverOutputActivePoseData(ActivePoseData['RBFDriverOutput'], PropertyGroup):
+
+    def __init__(self, output: 'RBFDriverOutput', pose_index: int) -> None:
+        self["type"] = output.get("type")
+        chans = output.channels
+        keys = chans.keys()
+        vals = [ch.data[pose_index].value for ch in chans]
+
+        if output.type == 'ROTATION':
+            outputmode = output.rotation_mode
+            activemode = self.rotation_mode
+
+            if outputmode != activemode:
+                cast = ACTIVE_POSE_DATA_ROTATION_CONVERSION_LUT[outputmode][activemode]
+                vals = cast(vals)
+
+        data = self.data__internal__
+        data.clear()
+
+        for key, val in zip(keys, vals):
+            item = data.add()
+            item["name"] = key
+            item["value"] = val
+
+    def update(self) -> None:
+        output = self.layer
+        values = list(self.values())
+
+        if output.type == 'ROTATION':
+            activemode = self.rotation_mode
+            outputmode = output.rotation_mode
+            if activemode != outputmode:
+                values = ACTIVE_POSE_DATA_ROTATION_CONVERSION_LUT[activemode][outputmode](values)
+        
+        pose_index = output.rbf_driver.poses.active_index
+
+        for channel, value in zip(output.channels, values):
+            channel.data[pose_index]["value"] = value
+
+        output_pose_data_idprops_update(output)
+
+#endregion Output Active Pose Data
+
+#region Output
+###################################################################################################
 
 def output_mute_get(output: 'RBFDriverOutput') -> bool:
     return all(channel.mute for channel in output.channels)
@@ -517,9 +663,25 @@ def output_mute_set(output: 'RBFDriverOutput', value: bool) -> None:
         channel.mute = value
 
 
+def output_name_update_handler(output: 'RBFDriverOutput', _) -> None:
+    names = [output.name for output in output.id_data.path_resolve(output.path_from_id.rpartition(".")[0])]
+    value = output.name
+    index = 0
+    while value in names:
+        index += 1
+        value = f'{output.name}.{str(index).zfill(3)}'
+    output["name"] = value
+
+    if output.has_symmetry_target:
+        output_mirror_property(output, "name")
+
+
 def output_use_logarithmic_map_update_handler(output: 'RBFDriverOutput', _) -> None:
     if output.type == 'ROTATION' and output.rotation_mode == 'QUATERNION':
         output_drivers_update(output, output.rbf_driver.poses)
+
+    if output.has_symmetry_target:
+        output_mirror_property(output, "use_logarithmic_map")
 
 
 def output_rotation_mode_get(output: 'RBFDriverOutput') -> int:
@@ -528,40 +690,51 @@ def output_rotation_mode_get(output: 'RBFDriverOutput') -> int:
 
 def output_rotation_mode_set(output: 'RBFDriverOutput', value: int) -> None:
     cache = output_rotation_mode_get(output)
-    if cache == value:
-        return
+    if cache != value:
+        output["rotation_mode_is_user_defined"] = True
 
-    output["rotation_mode"] = value
-    if output.type != 'ROTATION':
-        return
+        if output.type != 'ROTATION':
+            output["rotation_mode"] = value
+        else:
+            output_idprops_remove(output)
+            output_drivers_remove(output)
 
-    prevmode = OUTPUT_ROTATION_MODE_INDEX[cache]
-    currmode = OUTPUT_ROTATION_MODE_INDEX[value]
-    convert = ROTATION_CONVERSION_LUT[prevmode][currmode]
+            output["rotation_mode"] = value
+            channels = output.channels
 
-    matrix = np.array([
-        tuple(scalar.value for scalar in variable.data) for variable in input.variables
-        ], dtype=np.float)
+            if (OUTPUT_ROTATION_MODE_INDEX[cache] == 'EULER'
+                and all(channel.enabled for channel in channels[1:])
+                ):
+                channels[0]["enabled"] = True
 
-    for vector, column in zip(matrix.T if prevmode != 'EULER' else matrix[1:].T,
-                              matrix.T if currmode != 'EULER' else matrix[1:].T):
-        column[:] = convert(vector)
+            elif OUTPUT_ROTATION_MODE_INDEX[value] == 'EULER':
+                channels[0]["enabled"] = False
+                channels = channels[1:]
 
-    if currmode == 'EULER':
-        matrix[0] = 0.0
+            output_foreach_channel_update_datapath(output)
 
-    for channel, data in zip(output.channels, matrix):
-        channel.data.__init__(data)
+            for index, channel in enumerate(channels):
+                channel["array_index"] = index
 
-    output.update()
+            output_rotdata_update(output,
+                                  OUTPUT_ROTATION_MODE_INDEX[cache],
+                                  OUTPUT_ROTATION_MODE_INDEX[value])
 
-class RBFDriverOutput(Identifiable, PropertyGroup):
+            poses = output.rbf_driver.poses
+            output_idprops_update(output, len(poses))
+            output_drivers_update(output, poses)
 
-    def update(self, context: Optional[Any]=None) -> None:
-        poses = self.rbf_driver.poses
-        output_pose_data_idprops_update(self)
-        output_idprops_update(self, len(poses))
-        output_drivers_update(self, self.rbf_driver.poses)
+    if output.has_symmetry_target:
+        output_mirror_property(output, "rotation_mode")
+
+
+class RBFDriverOutput(Symmetrical, PropertyGroup):
+
+    active_pose: PointerProperty(
+        name="Pose",
+        type=RBFDriverOutputActivePoseData,
+        options=set()
+        )
 
     channels: PointerProperty(
         name="Channels",
@@ -590,7 +763,7 @@ class RBFDriverOutput(Identifiable, PropertyGroup):
         name="Name",
         default="Output",
         options=set(),
-        update=lambda self, _: self.update("name")
+        update=output_name_update_handler
         )
 
     @property
@@ -610,15 +783,26 @@ class RBFDriverOutput(Identifiable, PropertyGroup):
         return f'["{self.logmap_magnitude_property_name}"]'
 
     @property
+    def pose_count(self) -> int:
+        return len(self.rbf_driver.poses)
+
+    @property
     def rbf_driver(self) -> 'RBFDriver':
         path: str = self.path_from_id()
         return self.id_data.path_resolve(path.rpartition(".outputs.")[0])
 
     rotation_mode: EnumProperty(
+        name="Mode",
+        description="Rotation channels to drive (should match output target's rotation mode)",
         items=OUTPUT_ROTATION_MODE_ITEMS,
-        default='EULER',
+        get=output_rotation_mode_get,
+        set=output_rotation_mode_set,
         options=set(),
-        update=lambda self, _: self.update("rotation_mode")
+        )
+
+    rotation_mode_is_user_defined: BoolProperty(
+        get=lambda self: self.get("rotation_mode_is_user_defined", False),
+        options=set()
         )
 
     type: EnumProperty(
@@ -636,6 +820,18 @@ class RBFDriverOutput(Identifiable, PropertyGroup):
         options=set(),
         update=output_use_logarithmic_map_update_handler
         )
+
+    def update(self) -> None:
+        poses = self.rbf_driver.poses
+        output_influence_idprop_ensure(self)
+        output_pose_data_idprops_update(self)
+        output_idprops_update(self, len(poses))
+        output_drivers_update(self, poses)
+
+#endregion Output
+
+#region Outputs
+###################################################################################################
 
 class RBFDriverOutputs(Identifiable, PropertyGroup):
 
@@ -681,8 +877,218 @@ class RBFDriverOutputs(Identifiable, PropertyGroup):
     def items(self) -> List[Tuple[str, RBFDriverOutput]]:
         return self.collection__internal__.items()
 
+    def search(self, identifier: str) -> Optional[RBFDriverOutput]:
+        return next((output for output in self if output.identifier == identifier), None)
+
     def values(self) -> List[RBFDriverOutput]:
         return list(self)
+
+#endregion Outputs
+
+#endregion Data Layer
+
+#region Service Layer
+###################################################################################################
+
+#region Service Layer > Symmetry
+###################################################################################################
+
+def output_symmetry_target(output: RBFDriverOutput) -> Optional[RBFDriverOutput]:
+    """
+    """
+    if DEBUG:
+        assert isinstance(output, RBFDriverOutput)
+        assert output.has_symmetry_target
+
+    driver = output.rbf_driver
+    if not driver.has_symmetry_target:
+        log.warning(f'Symmetry target defined for component {output} but not for {driver}')
+        return
+
+    m_driver = driver.id_data.rbf_drivers.search(driver.symmetry_identifier)
+    if m_driver is None:
+        log.warning(f'Search failed for symmetry target of {driver}.')
+        return
+
+    return m_driver.outputs.search(output.symmetry_identifier)
+
+
+def output_channel_symmetry_target(channel: RBFDriverOutputChannel) -> Optional[RBFDriverOutputChannel]:
+    """
+    """
+    if DEBUG:
+        assert isinstance(channel, RBFDriverOutputChannel)
+        assert channel.has_symmetry_target
+
+    output = channel.output
+    if not output.has_symmetry_target:
+        log.warning((f'Symmetry target defined for sub-component {channel} but not for '
+                     f'parent component {output}'))
+        return
+
+    m_output = output_symmetry_target(output)
+    if m_output is None:
+        log.warning(f'Search failed for symmetry target of {output}.')
+        return
+
+    return m_output.channels.search(channel.symmetry_identifier)
+
+
+def output_symmetry_assign(a: RBFDriverOutput, b: RBFDriverOutput) -> None:
+    """
+    """
+    if DEBUG:
+        assert isinstance(a, RBFDriverOutput)
+        assert isinstance(b, RBFDriverOutput)
+        assert a.rbf_driver != b.rbf_driver
+
+    a['symmetry_identifier'] = b.identifier
+    b['symmetry_identifier'] = a.identifier
+
+    if len(a.channels) != len(b.channels):
+        log.warning(f'Assigning symmetry across outputs {a} and {b} with unequal channel counts')
+
+    for a, b in zip(a.channels, b.channels):
+        output_channel_symmetry_assign(a, b)
+
+
+def output_mirror_property(output: RBFDriverOutput, propname: str) -> None:
+    """
+    """
+    if DEBUG:
+        assert isinstance(output, RBFDriverOutput)
+        assert isinstance(propname, str)
+        assert hasattr(output, propname)
+
+    if not output.has_symmetry_target:
+        return
+
+    driver = output.rbf_driver
+
+    if not driver.has_symmetry_target:
+        log.warning(f'Symmetry target defined for component {output} but not for {driver}')
+        return
+
+    if driver.symmetry_lock__internal__:
+        return
+
+    m_driver = driver.id_data.rbf_drivers.search(driver.symmetry_identifier)
+    if m_driver is None:
+        log.warning(f'Search failed for symmetry target of {driver}.')
+        return
+
+    m_output = driver.outputs.search(output.symmetry_identifier)
+    if m_output is None:
+        log.warning(f'Search failed for symmetry target of {output}.')
+        return
+
+    log.info(f'Mirroring {output} property {propname}')
+    m_driver.symmetry_lock__internal__ = True
+
+    try:
+        setattr(m_output, propname, getattr(output, propname))
+    finally:
+        m_driver.symmetry_lock__internal__ = False
+
+
+def output_channel_mirror_property(channel: RBFDriverOutputChannel, propname: str, value: Optional[Any]=None) -> None:
+    """
+    """
+    if DEBUG:
+        assert isinstance(channel, RBFDriverOutputChannel)
+        assert isinstance(propname, str)
+        assert hasattr(channel, propname)
+
+    if not channel.has_symmetry_target:
+        return
+
+    output = channel.output
+
+    if not output.has_symmetry_target:
+        log.warning(f'Symmetry target defined for component {channel} but not for {output}')
+        return
+
+    driver = output.rbf_driver
+
+    if not driver.has_symmetry_target:
+        log.warning(f'Symmetry target defined for component {output} but not for {driver}')
+        return
+
+    if driver.symmetry_lock__internal__:
+        return
+
+    m_driver = driver.id_data.rbf_drivers.search(driver.symmetry_identifier)
+    if m_driver is None:
+        log.warning(f'Search failed for symmetry target of {driver}.')
+        return
+
+    m_output = driver.outputs.search(output.symmetry_identifier)
+    if m_output is None:
+        log.warning(f'Search failed for symmetry target of {output}.')
+        return
+
+    m_channel = m_output.variables.search(channel.symmetry_identifier)
+    if m_channel is None:
+        log.warning((f'Search failed for symmetry target of {channel}.'))
+        return
+
+    log.info(f'Mirroring {channel} property {propname}')
+    m_driver.symmetry_lock__internal__ = True
+
+    try:
+        setattr(m_channel, propname, getattr(channel, propname) if value is None else value)
+    finally:
+        m_driver.symmetry_lock__internal__ = False
+
+
+def output_channel_symmetry_assign(a: RBFDriverOutputChannel, b: RBFDriverOutputChannel) -> None:
+    """
+    """
+    if DEBUG:
+        assert isinstance(a, RBFDriverOutputChannel)
+        assert isinstance(b, RBFDriverOutputChannel)
+        assert a.output.rbf_driver != b.output.rbf_driver
+
+    a['symmetry_identifier'] = b.identifier
+    b['symmetry_identifier'] = a.identifier
+
+#endregion Service Layer > Symmetry
+
+def output_foreach_channel_update_property(output: 'RBFDriverOutput', key: str, value: Any) -> None:
+    for channel in output.channels:
+        channel[key] = value
+
+
+def output_foreach_channel_update_datapath(output: 'RBFDriverOutput') -> None:
+    type = output.type
+
+    if type in {'LOCATION', 'ROTATION', 'SCALE'}:
+        propname = f'rotation_{output.rotation_mode.lower()}' if type == 'ROTATION' else type.lower()
+        for channel in output.channels:
+            if channel.object is not None and channel.object.type == 'ARMATURE' and channel.bone_target:
+                channel["data_path"] = f'pose.bones["{channel.bone_target}"].{propname}'
+            else:
+                channel["data_path"] = propname
+
+    elif type == 'BBONE':
+        for channel in output.channels:
+            channel["data_path"] = f'pose.bones["{channel.bone_target}"].{channel.name}'
+
+    elif type == 'SHAPE_KEY':
+        for channel in output.channels:
+            channel["data_path"] = f'key_blocks["{channel.name}"].value'
+
+
+def output_channel_target_rotation_mode(channel: 'RBFDriverOutputChannel', output: Optional['RBFDriverOutput']=None) -> str:
+    output = output or channel.output
+    target = channel.object__internal__
+    result = output.rotation_mode
+    if target is not None:
+        if target.type == 'ARMATURE' and channel.bone_target:
+            target = target.pose.bones.get(channel.bone_target)
+        if target is not None:
+            result = 'EULER' if len(target.rotation_mode) < 5 else target.rotation_mode
+    return result
 
 
 def output_influence_idprop_create(output: RBFDriverOutput) -> None:
@@ -731,12 +1137,8 @@ def output_pose_data_idprops_update(output: RBFDriverOutput) -> None:
     channels = output.channels
     posedata = [tuple(scalar.value for scalar in channel.data) for channel in channels]
 
-    if (output.type == 'ROTATION'
-            and output.rotation_mode == 'QUATERNION'
-            and output.use_logarithmic_map):
-
+    if output_uses_logmap(output):
         posedata = np.array(posedata, dtype=np.float)
-
         for pose in posedata.T:
             pose[:] = quaternion_to_logarithmic_map(pose)
 
@@ -903,6 +1305,46 @@ def output_uses_logmap(output: RBFDriverOutput) -> bool:
             and output.use_logarithmic_map)
 
 
+def output_pose_data_append(output: RBFDriverOutput) -> None:
+    """
+    """
+    for channel in output.channels:
+        channel.data.data__internal__.add()["value"] = channel.value
+
+
+def output_pose_data_update(output: RBFDriverOutput, pose_index: int) -> None:
+    for channel in output.channels:
+        channel.data[pose_index]["value"] = channel.value
+    output_pose_data_idprops_update(output)
+
+
+def output_pose_data_remove(output: RBFDriverOutput, pose_index: int) -> None:
+    """
+    """
+    for channel in output.channels:
+        # bpy_prop_collection.remove() does not raise exceptions if index is out of bounds.
+        channel.data.data__internal__.remove(pose_index)
+    output_pose_data_idprops_update(output)
+
+
+def output_rotdata_update(output: 'RBFDriverOutput', from_mode: str, to_mode: str) -> None:
+    convert = ROTATION_CONVERSION_LUT[from_mode][to_mode]
+
+    matrix = np.array([
+        tuple(scalar.value for scalar in channel.data) for channel in output.channels
+        ], dtype=np.float)
+
+    for vector, column in zip(matrix.T if from_mode != 'EULER' else matrix[1:].T,
+                              matrix.T if to_mode   != 'EULER' else matrix[1:].T):
+        column[:] = convert(vector)
+
+    if to_mode == 'EULER':
+        matrix[0] = 0.0
+
+    for channel, data in zip(output.channels, matrix):
+        channel.data.__init__(data)
+
+
 def output_drivers_update(output: RBFDriverOutput, poses: RBFDriverPoses) -> None:
     
     channels = output.channels
@@ -914,7 +1356,22 @@ def output_drivers_update(output: RBFDriverOutput, poses: RBFDriverPoses) -> Non
         path = output.logmap_magnitude_property_path
         driven_properties = [(root, path, i) for i in range(4)]
     else:
-        driven_properties = [(ch.id, ch.data_path, ch.array_index) for ch in channels]
+        type = output.type
+        driven_properties = []
+
+        for channel in channels:
+            id = channel.id
+
+            if type == 'NONE':
+                path, index = data_path_split(channel.data_path)
+            else:
+                path = channel.data_path
+                index = channel.array_index if type in {'LOCATION', 'ROTATION', 'SCALE'} else -1
+            
+            if index >= 0:
+                driven_properties.append((id, path, index))
+            else:
+                driven_properties.append((id, path))
 
     for channel, driven_property in zip(channels, driven_properties):
 
@@ -970,16 +1427,30 @@ def output_idprops_remove(output: RBFDriverOutput) -> None:
 
 
 def output_drivers_remove(output: RBFDriverOutput) -> None:
-    driver_remove(output.id_data.data, output.logmap_magnitude_property_path)
+
+    root = output.id_data.data
+    type = output.type
+
+    driver_remove(root, output.logmap_magnitude_property_path)
+
     for index in range(4):
-        driver_remove(output.id_data.data, output.logmap_property_path, index)
+        driver_remove(root, output.logmap_property_path, index)
+
     for channel in output.channels:
         id = channel.id
         if id:
-            if channel.is_property_set("array_index"):
-                driver_remove(id, channel.data_path, channel.array_index)
+            if type == 'NONE':
+                path, index = data_path_split(channel.data_path)
             else:
-                driver_remove(id, channel.data_path)
-            for index in range(len(channel.ranges)):
-                driver_remove(channel.id_data.data, channel.driven_property_path, index)
+                path = channel.data_path
+                index = channel.array_index if type in {'LOCATION', 'ROTATION', 'SCALE'} else -1
 
+            if index >= 0:
+                driver_remove(id, path, index)
+            else:
+                driver_remove(id, path)
+
+            for index in range(len(channel.ranges__internal__)):
+                driver_remove(root, channel.driven_property_path, index)
+
+#endregion Service Layer

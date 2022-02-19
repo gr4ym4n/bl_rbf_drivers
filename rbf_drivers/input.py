@@ -6,13 +6,15 @@ from typing import (Any,
                     Callable,
                     Dict,
                     Iterator,
-                    List,
+                    List, Match,
                     Optional,
                     Sequence,
                     Tuple,
                     Union,
                     TYPE_CHECKING)
-
+import re
+import sys
+import logging
 from functools import partial
 from math import acos, asin, fabs, pi, sqrt
 from bpy.app import version
@@ -32,10 +34,10 @@ from bpy.props import (BoolProperty,
 
 import numpy as np
 from rna_prop_ui import rna_idprop_ui_create
-from .posedata import RBFDriverPoseDataVector
-from .mixins import ID_TYPE_ITEMS, Identifiable
-from .mixins import LAYER_TYPE_ITEMS
+from .posedata import RBFDriverPoseDataVector, ActivePoseData
+from .mixins import LAYER_TYPE_ITEMS, ID_TYPE_ITEMS, ID_TYPE_INDEX, Identifiable, Symmetrical
 from .lib import rotation_utils
+from .lib.symmetry import symmetrical_target
 from .lib.driver_utils import (DriverVariableNameGenerator,
                                driver_ensure,
                                driver_remove,
@@ -61,6 +63,10 @@ if TYPE_CHECKING:
 
 #region Configuration
 ###################################################################################################
+
+DEBUG = 'DEBUG_MODE' in sys.argv
+
+log = logging.getLogger('rbf_drivers')
 
 INFLUENCE_IDPROP_SETTINGS = {
     "default": 1.0,
@@ -322,7 +328,7 @@ INPUT_ROTATION_MODE_ITEMS = ROTATION_MODE_ITEMS[0:-3] + [
     ]
 
 INPUT_ROTATION_MODE_INDEX = {
-    item[0]: item[4] for item in INPUT_ROTATION_MODE_ITEMS
+    item[4]: item[0] for item in INPUT_ROTATION_MODE_ITEMS
     }
 
 INPUT_VARIABLE_DEFINITIONS = {
@@ -330,8 +336,9 @@ INPUT_VARIABLE_DEFINITIONS = {
         {
         "type": VARIABLE_TYPE_INDEX['SINGLE_PROP'],
         "name": "var",
-        "targets": []
+        "targets": [{}]
         }
+        NR34HY, 285 SPROWSTON ROAD
     ],
     'LOCATION': [
         {
@@ -440,15 +447,8 @@ INPUT_VARIABLE_DEFINITIONS = {
         "default": 0.0,
         "targets": [
             {
-            "data_path": "pose.bones[""].bbone_curveinx"
-            }]
-        },{
-        "type": VARIABLE_TYPE_INDEX['SINGLE_PROP'],
-        "name": "curveiny",
-        "default": 0.0,
-        "targets": [
-            {
-            "data_path": "pose.bones[""].bbone_curveiny"
+            "id_type": ID_TYPE_INDEX['ARMATURE'],
+            "data_path": 'pose.bones[""].bbone_curveinx'
             }]
         },{
         "type": VARIABLE_TYPE_INDEX['SINGLE_PROP'],
@@ -456,7 +456,8 @@ INPUT_VARIABLE_DEFINITIONS = {
         "default": 0.0,
         "targets": [
             {
-            "data_path": "pose.bones[""].bbone_curveinz"
+            "id_type": ID_TYPE_INDEX['ARMATURE'],
+            "data_path": 'pose.bones[""].bbone_curveinz'
             }]
         },
         {
@@ -465,16 +466,8 @@ INPUT_VARIABLE_DEFINITIONS = {
         "default": 0.0,
         "targets": [
             {
-            "data_path": "pose.bones[""].bbone_curveoutx"
-            }]
-        },
-        {
-        "type": VARIABLE_TYPE_INDEX['SINGLE_PROP'],
-        "name": "curveouty",
-        "default": 0.0,
-        "targets": [
-            {
-            "data_path": "pose.bones[""].bbone_curveouty"
+            "id_type": ID_TYPE_INDEX['ARMATURE'],
+            "data_path": 'pose.bones[""].bbone_curveoutx'
             }]
         },{
         "type": VARIABLE_TYPE_INDEX['SINGLE_PROP'],
@@ -482,7 +475,8 @@ INPUT_VARIABLE_DEFINITIONS = {
         "default": 0.0,
         "targets": [
             {
-            "data_path": "pose.bones[""].bbone_curveoutz"
+            "id_type": ID_TYPE_INDEX['ARMATURE'],
+            "data_path": 'pose.bones[""].bbone_curveoutz'
             }]
         },{
         "type": VARIABLE_TYPE_INDEX['SINGLE_PROP'],
@@ -490,7 +484,8 @@ INPUT_VARIABLE_DEFINITIONS = {
         "default": 0.0,
         "targets": [
             {
-            "data_path": "pose.bones[""].bbone_easein"
+            "id_type": ID_TYPE_INDEX['ARMATURE'],
+            "data_path": 'pose.bones[""].bbone_easein'
             }]
         },{
         "type": VARIABLE_TYPE_INDEX['SINGLE_PROP'],
@@ -498,7 +493,8 @@ INPUT_VARIABLE_DEFINITIONS = {
         "default": 0.0,
         "targets": [
             {
-            "data_path": "pose.bones[""].bbone_easeout"
+            "id_type": ID_TYPE_INDEX['ARMATURE'],
+            "data_path": 'pose.bones[""].bbone_easeout'
             }]
         },{
         "type": VARIABLE_TYPE_INDEX['SINGLE_PROP'],
@@ -506,7 +502,8 @@ INPUT_VARIABLE_DEFINITIONS = {
         "default": 0.0,
         "targets": [
             {
-            "data_path": "pose.bones[""].bbone_rollin"
+            "id_type": ID_TYPE_INDEX['ARMATURE'],
+            "data_path": 'pose.bones[""].bbone_rollin'
             }]
         },{
         "type": VARIABLE_TYPE_INDEX['SINGLE_PROP'],
@@ -514,7 +511,8 @@ INPUT_VARIABLE_DEFINITIONS = {
         "default": 0.0,
         "targets": [
             {
-            "data_path": "pose.bones[""].bbone_rollout"
+            "id_type": ID_TYPE_INDEX['ARMATURE'],
+            "data_path": 'pose.bones[""].bbone_rollout'
             }]
         },{
         "type": VARIABLE_TYPE_INDEX['SINGLE_PROP'],
@@ -522,7 +520,8 @@ INPUT_VARIABLE_DEFINITIONS = {
         "default": 0.0,
         "targets": [
             {
-            "data_path": f'pose.bones[""].bbone_scalein{"x" if version[0] < 3 else "[0]"}'
+            "id_type": ID_TYPE_INDEX['ARMATURE'],
+            "data_path": 'pose.bones[""].bbone_scalein[0]'
             }]
         },{
         "type": VARIABLE_TYPE_INDEX['SINGLE_PROP'],
@@ -530,6 +529,7 @@ INPUT_VARIABLE_DEFINITIONS = {
         "default": 0.0,
         "targets": [
             {
+            "id_type": ID_TYPE_INDEX['ARMATURE'],
             "data_path": f'pose.bones[""].bbone_scalein{"y" if version[0] < 3 else "[1]"}'
             }]
         },{
@@ -538,7 +538,8 @@ INPUT_VARIABLE_DEFINITIONS = {
         "default": 0.0,
         "targets": [
             {
-            "data_path": f'pose.bones[""].bbone_scalein{"z" if version[0] < 3 else "[1]"}'
+            "id_type": ID_TYPE_INDEX['ARMATURE'],
+            "data_path": 'pose.bones[""].bbone_scalein[1]'
             }]
         },{
         "type": VARIABLE_TYPE_INDEX['SINGLE_PROP'],
@@ -546,7 +547,8 @@ INPUT_VARIABLE_DEFINITIONS = {
         "default": 0.0,
         "targets": [
             {
-            "data_path": f'pose.bones[""].bbone_scaleout{"x" if version[0] < 3 else "[0]"}'
+            "id_type": ID_TYPE_INDEX['ARMATURE'],
+            "data_path": 'pose.bones[""].bbone_scaleout[0]'
             }]
         },{
         "type": VARIABLE_TYPE_INDEX['SINGLE_PROP'],
@@ -554,7 +556,8 @@ INPUT_VARIABLE_DEFINITIONS = {
         "default": 0.0,
         "targets": [
             {
-            "data_path": f'pose.bones[""].bbone_scaleout{"y" if version[0] < 3 else "[1]"}'
+            "id_type": ID_TYPE_INDEX['ARMATURE'],
+            "data_path": 'pose.bones[""].bbone_scaleout[1]'
             }]
         },{
         "type": VARIABLE_TYPE_INDEX['SINGLE_PROP'],
@@ -562,7 +565,8 @@ INPUT_VARIABLE_DEFINITIONS = {
         "default": 0.0,
         "targets": [
             {
-            "data_path": f'pose.bones[""].bbone_scaleout{"z" if version[0] < 3 else "[1]"}'
+            "id_type": ID_TYPE_INDEX['ARMATURE'],
+            "data_path": 'pose.bones[""].bbone_scaleout[1]'
             }]
         }
     ],
@@ -601,6 +605,10 @@ def input_target_bone_target_update_handler(target: 'RBFDriverInputTarget', _) -
             variable.targets[0]["data_path"] = f'pose.bones["{value}"].{spec["path"]}'
         input_pose_distance_driver_update_all(input, pose_count=input.pose_count)
 
+    if target.has_symmetry_target:
+        mirror = symmetrical_target(value) or value
+        input_target_mirror_property(target, "bone_target", value=mirror, input=input)
+
 
 def input_target_data_path_get(target: 'RBFDriverInputTarget') -> str:
     return target.get("data_path", "")
@@ -608,17 +616,36 @@ def input_target_data_path_get(target: 'RBFDriverInputTarget') -> str:
 
 def input_target_data_path_set(target: 'RBFDriverInputTarget', value: str) -> None:
     input = target.input
-    if input.type in ('BBONE', 'SHAPE_KEY'):
+
+    if input.type != 'NONE':
         raise RuntimeError((f'{target.__class__.__name__}.data_path '
                             f'is not user-editable for inputs of type {input.type}'))
-    elif input.type == 'NONE':
-        input_pose_distance_driver_update_all(input, pose_count=input.pose_count)
+    
+    input["data_path"] = value
+    input_pose_distance_driver_update_all(input, pose_count=input.pose_count)
+
+    if target.has_symmetry_target:
+
+        def replace(match: Match):
+            value = match.group()
+            return symmetrical_target(value) or value
+
+        input_target_mirror_property(target, "data_path",
+                                     value=re.findall(r'\["(.*?)"\]', replace, value),
+                                     input=input)
 
 
 def input_target_id_type_update_handler(target: 'RBFDriverInputTarget', _) -> None:
     input = target.input
-    if input.type == 'NONE':
-        input_pose_distance_driver_update_all(input, pose_count=input.pose_count)
+
+    if input.type != 'NONE':
+        raise RuntimeError((f'{target.__class__.__name__}.id_type '
+                            f'is not user-editable for inputs of type {input.type}'))
+
+    input_pose_distance_driver_update_all(input, pose_count=input.pose_count)
+
+    if target.has_symmetry_target:
+        input_target_mirror_property(target, "id_type", input=input)
 
 
 def input_target_object_update_handler(target: 'RBFDriverInputTarget', _) -> None:
@@ -630,6 +657,9 @@ def input_target_object_update_handler(target: 'RBFDriverInputTarget', _) -> Non
             variable.targets[0]["object"] = value
         input_pose_distance_driver_update_all(input, pose_count=input.pose_count)
 
+    if target.has_symmetry_target:
+        input_target_mirror_property(target, "object", input=input)
+
 
 def input_target_rotation_mode_update_handler(target: 'RBFDriverInputTarget', _) -> None:
     input = target.input
@@ -639,6 +669,9 @@ def input_target_rotation_mode_update_handler(target: 'RBFDriverInputTarget', _)
         for variable in input.variables:
             variable.targets[0]["rotation_mode"] = value
         input_pose_distance_driver_update_all(input, pose_count=input.pose_count)
+
+    if target.has_symmetry_target:
+        input_target_mirror_property(target, "rotation_mode", input=input)
 
 
 def input_target_transform_space_update_handler(target: 'RBFDriverInputTarget', _) -> None:
@@ -650,14 +683,31 @@ def input_target_transform_space_update_handler(target: 'RBFDriverInputTarget', 
             variable.targets[0]["transform_space"] = value
         input_pose_distance_driver_update_all(input, pose_count=input.pose_count)
 
+    if target.has_symmetry_target:
+        input_target_mirror_property(target, "transform_space", input=input)
 
-def input_target_transform_type_update_handler(target: 'RBFDriverInputTarget', _) -> None:
+
+def input_target_transform_type_get(target: 'RBFDriverInputTarget') -> int:
+    return target.get("transform_type", 0)
+
+
+def input_target_transform_type_set(target: 'RBFDriverInputTarget', value: int) -> None:
     input = target.input
+
+    if input.type in {'LOCATION', 'ROTATION', 'SCALE'}:
+        raise RuntimeError((f'{target.__class__.__name__}.transform_type '
+                            f'is not user-editable for inputs of type {input.type}'))
+
+    target["transform_type"] = value
+
     if input.type == 'NONE':
         input_pose_distance_driver_update_all(input, pose_count=input.pose_count)
 
+    if target.has_symmetry_target:
+        input_target_mirror_property(target, "transform_type", input=input)
 
-class RBFDriverInputTarget(PropertyGroup):
+
+class RBFDriverInputTarget(Symmetrical, PropertyGroup):
 
     bone_target: StringProperty(
         name="Bone",
@@ -727,10 +777,16 @@ class RBFDriverInputTarget(PropertyGroup):
         name="Type",
         description="The transform channel to target",
         items=TRANSFORM_TYPE_ITEMS,
-        default=TRANSFORM_TYPE_ITEMS[0][0],
+        get=input_target_transform_type_get,
+        set=input_target_transform_type_set,
         options=set(),
-        update=input_target_transform_type_update_handler
         )
+
+    @property
+    def variable(self) -> 'RBFDriverInputVariable':
+        """The input variable to which this input target belongs"""
+        path: str = self.path_from_id()
+        return self.id_data.path_resolve(path.rpartition(".targets.")[0])
 
 #endregion Input Target
 
@@ -772,32 +828,108 @@ class RBFDriverInputTargets(PropertyGroup):
         raise TypeError((f'{self.__class__.__name__}[key]: '
                          f'Expected key to be int or slice, not {key.__class__.__name__}'))
 
+    def search(self, identifier: str) -> Optional[RBFDriverInputTarget]:
+        return next((target for target in self if target.identifier == identifier), None)
+
 #endregion Input Targets
 
 #region Input Variable
 ###################################################################################################
 
-def input_variable_name_update_handler(variable: 'RBFDriverInputVariable', _) -> None:
+
+def input_variable_name_get(variable: 'RBFDriverInputVariable') -> str:
+    return variable.get("name", "")
+
+
+def input_variable_name_set(variable: 'RBFDriverInputVariable', value: str) -> None:
     input = variable.input
+
+    if input.type not in {'NONE', 'SHAPE_KEY'}:
+        raise RuntimeError(f'{variable} name is not user-editable for input type {input.type}')
+
     if input.type == 'SHAPE_KEY':
         target: RBFDriverInputTarget = variable.targets[0]
-        target["data_path"] = f'key_blocks["{variable.name}"].value'
-        input_pose_distance_driver_update_all(input, pose_count=input.pose_count)
+        target["data_path"] = f'key_blocks["{value}"].value'
+        input_pose_distance_driver_update_all(input, input.pose_count)
+
+    input_variable_mirror_property(variable, "name", input=input)
 
 
-def input_variable_type_update_handler(variable: 'RBFDriverInputVariable', _) -> None:
+def input_variable_type_get(variable: 'RBFDriverInputVariable') -> int:
+    return variable.get("type", 0)
+
+
+def input_variable_type_set(variable: 'RBFDriverInputVariable', value: int) -> None:
     input = variable.input
-    if input.type == 'SHAPE_KEY':
-        variable["type"] = 0
+    if input.type == 'NONE':
+        variable["type"] = value
+
+        if variable.type.endswith('DIFF'):
+            if len(variable.targets) < 2:
+                variable.targets.size__internal = 2
+                variable.targets.collection__internal__.add()
+        else:
+            variable.targets.size__internal__ = 1
+
+        input_variable_mirror_property(variable, "type", input=input)
+    else:
         raise RuntimeError((f'{variable.__class__.__name__}.type '
-                            f'is not user-editable for shape key inputs.'))
+                            f'is not user-editable for {input.type} inputs.'))
+
+
+def input_variable_default_update_handler(variable: 'RBFDriverInputVariable', _) -> None:
+    input_variable_mirror_property(variable, "default")
 
 
 def input_variable_enabled_update_handler(variable: 'RBFDriverInputVariable', _) -> None:
-    variable.input.update()
+    input = variable.input
+    input.update()
+    input_variable_mirror_property(variable, "enabled", input=input)
 
 
-class RBFDriverInputVariable(PropertyGroup):
+def input_variable_invert_update_handler(variable: 'RBFDriverInputVariable', _) -> None:
+    if variable.has_symmetry_target:
+        # TODO
+        input_variable_mirror_property(variable, "invert")
+
+def input_variable_value_get(variable: 'RBFDriverInputVariable') -> float:
+    type = variable.type
+
+    if type == 'TRANSFORMS':
+        t = variable.targets[0]
+        m = transform_matrix(transform_target(t.object, t.bone_target), t.transform_space)
+        return transform_matrix_element(m, t.transform_type, t.rotation_mode, driver=True)
+
+    if type == 'LOC_DIFF':
+        a = variable.targets[0]
+        b = variable.targets[1]
+        return transform_target_distance(transform_target(a.object, a.bone_target),
+                                            transform_target(b.object, b.bone_target),
+                                            a.transform_space,
+                                            b.transform_space)
+
+    if type == 'ROT_DIFF':
+        a = variable.targets[0]
+        b = variable.targets[1]
+        return transform_target_rotational_difference(transform_target(a.object, a.bone_target),
+                                                        transform_target(b.object, b.bone_target))
+
+    if type == 'SINGLE_PROP':
+        t = variable.targets[0]
+        o = t.id
+        if o:
+            try:
+                v = o.path_resolve(t.data_path)
+            except ValueError:
+                pass
+            else:
+                if isinstance(v, (float, int, bool)):
+                    return float(v)
+
+    return 0.0
+
+
+class RBFDriverInputVariable(Symmetrical, PropertyGroup):
 
     data: PointerProperty(
         name="Data",
@@ -811,6 +943,7 @@ class RBFDriverInputVariable(PropertyGroup):
         description="The default value for the variable",
         default=0.0,
         options=set(),
+        update=input_variable_default_update_handler
         )
 
     enabled: BoolProperty(
@@ -827,11 +960,20 @@ class RBFDriverInputVariable(PropertyGroup):
         path: str = self.path_from_id()
         return self.id_data.path_resolve(path.rpartition(".variables.")[0])
 
+    invert: BoolProperty(
+        name="Invert",
+        description="Invert the input variable's value when mirroring",
+        default=False,
+        options=set(),
+        update=input_variable_invert_update_handler
+        )
+
     name: StringProperty(
         name="Name",
         description="Variable name",
+        get=input_variable_name_get,
+        set=input_variable_name_set,
         options=set(),
-        update=input_variable_name_update_handler
         )
 
     targets: PointerProperty(
@@ -845,48 +987,21 @@ class RBFDriverInputVariable(PropertyGroup):
         name="Type",
         description="The variable type",
         items=VARIABLE_TYPE_ITEMS,
-        default='SINGLE_PROP',
+        get=input_variable_type_get,
+        set=input_variable_type_set,
         options=set(),
-        update=input_variable_type_update_handler
         )
 
-    @property
-    def value(self) -> float:
-        """The current value of the variable"""
-        type = self.type
+    value: FloatProperty(
+        name="Value",
+        description="The current value of the variable (read-only)",
+        get=input_variable_value_get,
+        options=set()
+        )
 
-        if type == 'TRANSFORMS':
-            t = self.targets[0]
-            m = transform_matrix(transform_target(t.object, t.bone_target), t.transform_space)
-            return transform_matrix_element(m, t.transform_type, t.rotation_mode, driver=True)
-
-        if type == 'LOC_DIFF':
-            a = self.targets[0]
-            b = self.targets[1]
-            return transform_target_distance(transform_target(a.object, a.bone_target),
-                                             transform_target(b.object, b.bone_target),
-                                             a.transform_space,
-                                             b.transform_space)
-
-        if type == 'ROT_DIFF':
-            a = self.targets[0]
-            b = self.targets[1]
-            return transform_target_rotational_difference(transform_target(a.object, a.bone_target),
-                                                          transform_target(b.object, b.bone_target))
-
-        if type == 'SINGLE_PROP':
-            t = self.targets[0]
-            o = t.id
-            if o:
-                try:
-                    v = o.path_resolve(t.data_path)
-                except ValueError:
-                    pass
-                else:
-                    if isinstance(v, (float, int, bool)):
-                        return float(v)
-
-        return 0.0
+    def __str__(self) -> str:
+        return (f'<{self.__class__.__name__}({self.type}, "{self.name}") '
+                f'at {self.path_from_id().replace(".collection__internal__", "")}>')
 
 #endregion Input Variable
 
@@ -894,6 +1009,18 @@ class RBFDriverInputVariable(PropertyGroup):
 ###################################################################################################
 
 class RBFDriverInputVariables(PropertyGroup):
+
+    active_index: IntProperty(
+        name="Shape Key",
+        min=0,
+        default=0,
+        options=set()
+        )
+
+    @property
+    def active(self) -> Optional[RBFDriverInputVariable]:
+        index = self.active_index
+        return self[index] if index < len(self) else None
 
     collection__internal__: CollectionProperty(
         type=RBFDriverInputVariable,
@@ -935,19 +1062,91 @@ class RBFDriverInputVariables(PropertyGroup):
     def get(self, name: str, default: Optional[object]=None) -> Any:
         return self.collection__internal__.get(name, default)
 
+    def keys(self) -> Iterator[str]:
+        return self.collection__internal__.keys()
+
+    def search(self, identifier: str) -> Optional[RBFDriverInputVariable]:
+        return next((variable for variable in self if variable.identifier == identifier), None)
+
 #endregion Input Variables
+
+#region Input Active Pose Data
+###################################################################################################
+
+class RBFDriverInputActivePoseData(ActivePoseData['RBFDriverInput'], PropertyGroup):
+
+    def __init__(self, input: 'RBFDriverInput', pose_index: int) -> None:
+        self["type"] = input.get("type")
+
+        vars = input.variables
+        keys = vars.keys()
+        vals = [var.data[pose_index].value for var in vars]
+
+        if input.type == 'ROTATION':
+            mode = input.rotation_mode
+            if   len(mode) < 5           : vals = rotation_utils.euler_to_quaternion(vals[1:])
+            elif mode.startswith('TWIST'): vals = rotation_utils.swing_twist_to_quaternion(vals, mode[-1])
+
+            mode = self.rotation_mode
+            if   mode == 'EULER'     : vals = (0.0,) + tuple(rotation_utils.quaternion_to_euler(vals))
+            elif mode == 'AXIS_ANGLE': vals = rotation_utils.quaternion_to_axis_angle(vals, vectorize=True)
+
+        data = self.data__internal__
+        data.clear()
+
+        for key, val in zip(keys, vals):
+            item = data.add()
+            item["name"] = key
+            item["value"] = val
+
+    def update(self) -> None:
+        input = self.layer
+        poses = input.rbf_driver.poses
+        
+        pose_index = poses.active_index
+        pose_count = len(poses)
+        pose_values = list(self.values())
+
+        if input.type == 'ROTATION':
+            currmode = self.rotation_mode
+            nextmode = input.rotation_mode
+
+            if currmode == 'EULER':
+                currmode = 'AUTO'
+                pose_values = pose_values[1:]
+            elif currmode == 'AXIS_ANGLE':
+                currmode = 'QUATERNION'
+                pose_values = rotation_utils.axis_angle_to_quaternion(pose_values)
+
+            pose_values = ROTATION_CONVERSION_LUT[currmode][nextmode](pose_values)
+
+            if len(pose_values) == 3:
+                pose_values = (0.0,) + tuple(pose_values)
+
+        for variable, value in zip(input.variables, pose_values):
+            variable.data[pose_index]["value"] = value
+
+        input_pose_radii_update(input)
+        input_pose_distance_driver_update(input, pose_index)
+        input_pose_distance_fcurve_update_all(input, pose_count)
+
+
+#endregion Active Pose Data
 
 #region Input
 ###################################################################################################
 
 def input_name_update_handler(input: 'RBFDriverInput', _) -> None:
-    names = [input.name for input in input.id_data.path_resolve(input.path_from_id(".")[0])]
+    names = [input.name for input in input.id_data.path_resolve(input.path_from_id.rpartition(".")[0])]
     value = input.name
     index = 0
     while value in names:
         index += 1
         value = f'{input.name}.{str(index).zfill(3)}'
     input["name"] = value
+
+    if input.has_symmetry_target:
+        input_mirror_property(input, "name")
 
 
 def input_rotation_mode_get(input: 'RBFDriverInput') -> int:
@@ -956,35 +1155,26 @@ def input_rotation_mode_get(input: 'RBFDriverInput') -> int:
 
 def input_rotation_mode_set(input: 'RBFDriverInput', value: int) -> None:
     cache = input_rotation_mode_get(input)
-    if cache == value:
-        return
+    if cache != value:
+        input["rotation_mode"] = value
+        if input.type == 'ROTATION':
+            input_rottags_update(input)
+            input_rotdata_update(input,
+                                 INPUT_ROTATION_MODE_INDEX[cache],
+                                 INPUT_ROTATION_MODE_INDEX[value])
+            input.update()
 
-    input["rotation_mode"] = value
-    if input.type != 'ROTATION':
-        return
-
-    prevmode = INPUT_ROTATION_MODE_INDEX[cache]
-    currmode = INPUT_ROTATION_MODE_INDEX[value]
-    convert = ROTATION_CONVERSION_LUT[prevmode][currmode]
-
-    matrix = np.array([
-        tuple(scalar.value for scalar in variable.data) for variable in input.variables
-        ], dtype=np.float)
-
-    for vector, column in zip(matrix.T if len(prevmode) > 4 else matrix[1:].T,
-                              matrix.T if len(currmode) > 4 else matrix[1:].T):
-        column[:] = convert(vector)
-
-    if len(currmode) < 5:
-        matrix[0] = 0.0
-
-    for variable, data in zip(input.variables, matrix):
-        variable.data.__init__(data)
-    
-    input.update()
+    if input.has_symmetry_target:
+        input_mirror_property(input, "rotation_mode")
 
 
-class RBFDriverInput(Identifiable, PropertyGroup):
+class RBFDriverInput(Symmetrical, PropertyGroup):
+
+    active_pose: PointerProperty(
+        name="Pose",
+        type=RBFDriverInputActivePoseData,
+        options=set()
+        )
 
     @property
     def influence_property_name(self) -> str:
@@ -1032,14 +1222,7 @@ class RBFDriverInput(Identifiable, PropertyGroup):
     rotation_mode: EnumProperty(
         name="Mode",
         description="Rotation mode",
-        items=ROTATION_MODE_ITEMS[0:-3] + [
-            ('SWING_X'   , "X Swing"   , "Swing rotation to aim the X axis"            , 'NONE', 8),
-            ('SWING_Y'   , "Y Swing"   , "Swing rotation to aim the Y axis"            , 'NONE', 9),
-            ('SWING_Z'   , "Z Swing"   , "Swing rotation to aim the Z axis"            , 'NONE', 10),
-            ('TWIST_X'   , "X Twist"   , "Twist around the X axis"                     , 'NONE', 11),
-            ('TWIST_Y'   , "Y Twist"   , "Twist around the Y axis"                     , 'NONE', 12),
-            ('TWIST_Z'   , "Z Twist"   , "Twist around the Z axis"                     , 'NONE', 13),
-            ],
+        items=INPUT_ROTATION_MODE_ITEMS,
         get=input_rotation_mode_get,
         set=input_rotation_mode_set,
         options=set(),
@@ -1051,6 +1234,10 @@ class RBFDriverInput(Identifiable, PropertyGroup):
         get=lambda self: self.get("type", 0),
         options=set(),
         )
+
+    def __str__(self) -> str:
+        return (f'<{self.__class__.__name__}("{self.name}") at '
+                f'{self.path_from_id().replace(".collection__internal__", "")}>')
 
     def update(self) -> None:
         pose_count = self.pose_count
@@ -1104,11 +1291,11 @@ class RBFDriverInputs(Identifiable, PropertyGroup):
     def __iter__(self) -> Iterator[RBFDriverInput]:
         return iter(self.collection__internal__)
 
-    def find(self, name: str) -> int:
-        return self.collection__internal__.find(name)
-
     def get(self, name: str, default: Optional[object]=None) -> Any:
         return self.collection__internal__.get(name, default)
+
+    def find(self, name: str) -> int:
+        return self.collection__internal__.find(name)
 
     def keys(self) -> List[str]:
         return self.collection__internal__.keys()
@@ -1116,14 +1303,335 @@ class RBFDriverInputs(Identifiable, PropertyGroup):
     def items(self) -> List[Tuple[str, RBFDriverInput]]:
         return self.collection__internal__.items()
 
+    def search(self, identifier: str) -> Optional[RBFDriverInput]:
+        return next((input for input in self if input.identifier == identifier), None)
+
     def values(self) -> List[RBFDriverInput]:
         return list(self)
 
 #endregion Inputs
+
 #endregion Data Layer
 
 #region Service Layer
 ###################################################################################################
+
+
+def input_symmetry_target(input: RBFDriverInput) -> Optional[RBFDriverInput]:
+    """
+    """
+    if DEBUG:
+        assert isinstance(input, RBFDriverInput)
+        assert input.has_symmetry_target
+
+    driver = input.rbf_driver
+    if not driver.has_symmetry_target:
+        log.warning(f'Symmetry target defined for component {input} but not for {driver}')
+        return
+
+    m_driver = driver.id_data.rbf_drivers.search(driver.symmetry_identifier)
+    if m_driver is None:
+        log.warning(f'Search failed for symmetry target of {driver}.')
+        return
+
+    return m_driver.inputs.search(input.symmetry_identifier)
+
+
+def input_variable_symmetry_target(variable: RBFDriverInputVariable) -> Optional[RBFDriverInputVariable]:
+    """
+    """
+    if DEBUG:
+        assert isinstance(variable, RBFDriverInputVariable)
+        assert variable.has_symmetry_target
+
+    input = variable.input
+    if not input.has_symmetry_target:
+        log.warning((f'Symmetry target defined for sub-component {variable} but not for '
+                     f'parent component {input}'))
+        return
+
+    m_input = input_symmetry_target(input)
+    if m_input is None:
+        log.warning(f'Search failed for symmetry target of {input}.')
+        return
+
+    return m_input.variables.search(variable.symmetry_identifier)
+
+
+def input_target_symmetry_target(target: RBFDriverInputTarget) -> Optional[RBFDriverInputTarget]:
+    """
+    """
+    if DEBUG:
+        assert isinstance(target, RBFDriverInputTarget)
+        assert target.has_symmetry_target
+
+    variable = target.variable
+    if not variable.has_symmetry_target:
+        log.warning((f'Symmetry target defined for sub-component {target} but not for '
+                     f'parent component {variable}'))
+        return
+
+    m_variable = input_variable_symmetry_target(variable)
+    if m_variable is None:
+        log.warning(f'Search failed for symmetry target of {variable}')
+        return
+
+    return m_variable.targets.search(target.symmetry_identifier)
+
+
+def input_target_symmetry_assign(a: RBFDriverInputTarget, b: RBFDriverInputTarget) -> None:
+    """
+    """
+    if DEBUG:
+        assert isinstance(a, RBFDriverInput)
+        assert isinstance(b, RBFDriverInput)
+        assert a.variable.input.rbf_driver != b.variable.input.rbf_driver
+
+    a['symmetry_identifier'] = b.identifier
+    b['symmetry_identifier'] = a.identifier
+
+
+def input_variable_symmetry_assign(a: RBFDriverInputVariable, b: RBFDriverInputVariable) -> None:
+    """
+    """
+    if DEBUG:
+        assert isinstance(a, RBFDriverInputVariable)
+        assert isinstance(b, RBFDriverInputVariable)
+        assert a.input.rbf_driver != b.input.rbf_driver
+
+    a['symmetry_identifier'] = b.identifier
+    b['symmetry_identifier'] = a.identifier
+
+    if len(a.targets) != len(b.targets):
+        log.warning(f'Assigning symmetry across variables {a} and {b} with unequal target counts')
+
+    for a, b in zip(a.targets, b.targets):
+        input_target_symmetry_assign(a, b)
+
+
+def input_symmetry_assign(a: RBFDriverInput, b: RBFDriverInput) -> None:
+    """
+    """
+    if DEBUG:
+        assert isinstance(a, RBFDriverInput)
+        assert isinstance(b, RBFDriverInput)
+        assert a.rbf_driver != b.rbf_driver
+
+    a['symmetry_identifier'] = b.identifier
+    b['symmetry_identifier'] = a.identifier
+
+    if len(a.variables) != len(b.variables):
+        log.warning(f'Assigning symmetry across inputs {a} and {b} with unequal variable counts')
+
+    for a, b in zip(a.variables, b.variables):
+        input_variable_symmetry_assign(a, b)
+
+
+def input_target_mirror_property(target: RBFDriverInputTarget,
+                                 propname: str,
+                                 value: Optional[Any]=None,
+                                 input: Optional[RBFDriverInput]=None) -> None:
+    """
+    Mirrors an input target's property value to the symmetrical input target if a symmetrical
+    input target can be found.
+    """
+    if DEBUG:
+        assert isinstance(target, RBFDriverInputTarget)
+        assert isinstance(propname, str)
+        assert hasattr(target, propname)
+        assert input is None or isinstance(input, RBFDriverInput)
+
+    if not target.has_symmetry_target:
+        return
+
+    variable = target.variable
+    if not variable.has_symmetry_target:
+        log.warning(f'Symmetry target defined for component {target} but not for {variable}')
+        return
+
+    input = variable.input
+    if not input.has_symmetry_target:
+        log.warning(f'Symmetry target defined for component {variable} but not for {input}')
+        return
+
+    driver = input.rbf_driver
+
+    if not driver.has_symmetry_target:
+        log.warning(f'Symmetry target defined for component {input} but not for {driver}')
+        return
+
+    if driver.symmetry_lock__internal__:
+        return
+
+    m_driver = driver.id_data.rbf_drivers.search(driver.symmetry_identifier)
+    if m_driver is None:
+        log.warning(f'Search failed for symmetry target of {driver}.')
+        return
+
+    m_input = driver.inputs.search(input.symmetry_identifier)
+    if m_input is None:
+        log.warning(f'Search failed for symmetry target of {input}.')
+        return
+
+    m_variable = m_input.variables.search(variable.symmetry_identifier)
+    if m_variable is None:
+        log.warning((f'Search failed for symmetry target of {variable}.'))
+        return
+
+    m_target = m_variable.targets.search(target.symmetry_identifier)
+    if m_target is None:
+        log.warning((f'Search failed for symmetry target of {target}.'))
+        return
+
+    log.info(f'Mirroring {variable} property {propname}')
+    m_driver.symmetry_lock__internal__ = True
+
+    try:
+        setattr(m_target, propname, getattr(target, propname) if value is None else value)
+    finally:
+        m_driver.symmetry_lock__internal__ = False
+
+
+def input_variable_mirror_property(variable: RBFDriverInputVariable,
+                                   propname: str,
+                                   input: Optional[RBFDriverInput]=None) -> None:
+    """
+    Mirrors an input variable's property value to the symmetrical input variable if a symmetrical
+    input variable can be found.
+    """
+    if DEBUG:
+        assert isinstance(variable, RBFDriverInputVariable)
+        assert isinstance(propname, str)
+        assert hasattr(variable, propname)
+        assert input is None or isinstance(input, RBFDriverInput)
+
+    if not variable.has_symmetry_target:
+        return
+
+    input = variable.input
+    if not input.has_symmetry_target:
+        log.warning(f'Symmetry target defined for component {variable} but not for {input}')
+        return
+
+    driver = input.rbf_driver
+
+    if not driver.has_symmetry_target:
+        log.warning(f'Symmetry target defined for component {input} but not for {driver}')
+        return
+
+    if driver.symmetry_lock__internal__:
+        return
+
+    m_driver = driver.id_data.rbf_drivers.search(driver.symmetry_identifier)
+    if m_driver is None:
+        log.warning(f'Search failed for symmetry target of {driver}.')
+        return
+
+    m_input = driver.inputs.search(input.symmetry_identifier)
+    if m_input is None:
+        log.warning(f'Search failed for symmetry target of {input}.')
+        return
+
+    m_variable = m_input.variables.search(variable.symmetry_identifier)
+    if m_variable is None:
+        log.warning((f'Search failed for symmetry target of {variable}.'))
+        return
+
+    log.info(f'Mirroring {variable} property {propname}')
+    m_driver.symmetry_lock__internal__ = True
+
+    try:
+        setattr(m_variable, propname, getattr(variable, propname))
+    finally:
+        m_driver.symmetry_lock__internal__ = False
+
+
+def input_mirror_property(input: RBFDriverInput, propname: str) -> None:
+    """
+    Mirrors an input's, property value to the symmetrical input if a symmetrical
+    input can be found.
+    """
+    if DEBUG:
+        assert isinstance(input, RBFDriverInputVariable)
+        assert isinstance(propname, str)
+        assert hasattr(input, propname)
+
+    if not input.has_symmetry_target:
+        return
+
+    driver = input.rbf_driver
+
+    if not driver.has_symmetry_target:
+        log.warning(f'Symmetry target defined for component {input} but not for {driver}')
+        return
+
+    if driver.symmetry_lock__internal__:
+        return
+
+    m_driver = driver.id_data.rbf_drivers.search(driver.symmetry_identifier)
+    if m_driver is None:
+        log.warning(f'Search failed for symmetry target of {driver}.')
+        return
+
+    m_input = driver.inputs.search(input.symmetry_identifier)
+    if m_input is None:
+        log.warning(f'Search failed for symmetry target of {input}.')
+        return
+
+    log.info(f'Mirroring {input} property {propname}')
+    m_driver.symmetry_lock__internal__ = True
+
+    try:
+        setattr(m_input, propname, getattr(input, propname))
+    finally:
+        m_driver.symmetry_lock__internal__ = False
+
+
+def input_variable_is_enabled(variable: RBFDriverInputVariable) -> bool:
+    """
+    Returns the boolean flag indicating whether or not the input variable is enabled. Can be used
+    as a utility function when filtering input variables.
+    """
+    if DEBUG:
+        assert isinstance(variable, RBFDriverInputVariable)
+
+    return variable.enabled
+
+
+def input_rotdata_update(input: 'RBFDriverInput', from_mode: str, to_mode: str) -> None:
+    convert = ROTATION_CONVERSION_LUT[from_mode][to_mode]
+
+    matrix = np.array([
+        tuple(scalar.value for scalar in variable.data) for variable in input.variables
+        ], dtype=np.float)
+
+    for vector, column in zip(matrix.T if len(from_mode) > 4 else matrix[1:].T,
+                              matrix.T if len(to_mode)   > 4 else matrix[1:].T):
+        column[:] = convert(vector)
+
+    if len(to_mode) < 5:
+        matrix[0] = 0.0
+
+    for variable, data in zip(input.variables, matrix):
+        variable.data.__init__(data)
+
+
+def input_rottags_update(input: 'RBFDriverInput') -> None:
+    mode = input.rotation_mode
+    vars = input.variables
+
+    if len(mode) < 5:
+        vars[0]["enabled"] = False
+    elif mode.startswith('TWIST'):
+        axis = mode[-1]
+        vars[0]["enabled"] = False
+        vars[0]["enabled"] = axis == 'X'
+        vars[0]["enabled"] = axis == 'Y'
+        vars[0]["enabled"] = axis == 'Z'
+    else:
+        for var in vars:
+            var["enabled"] = True
+
 
 def input_pose_distance_metric_angle(a: Sequence[float], b: Sequence[float], axis: str) -> float:
     index = 'WXYZ'.index(axis)
@@ -1165,39 +1673,110 @@ def input_pose_distance_metric(input: RBFDriverInput) -> Callable[[Sequence[floa
 
 
 def input_pose_distance_matrix(input: RBFDriverInput) -> np.ndarray:
+    """
+    """
+    if DEBUG:
+        assert isinstance(input, RBFDriverInput)
+
     metric = input_pose_distance_metric(input)
-    params = np.array([tuple(var.data.values()) for var in input.variables], dtype=np.float).T
+    params = np.array([tuple(var.data.values()) for var in input.variables if var.enabled], dtype=np.float).T
     matrix = np.empty((len(params), len(params)), dtype=np.float)
+
     for param, row in zip(params, matrix):
         for index, other in enumerate(params):
             row[index] = metric(param, other)
+
     return matrix
 
 
 def input_pose_radii_update(input: RBFDriverInput) -> None:
+    """
+    """
+    if DEBUG:
+        assert isinstance(input, RBFDriverInput)
+
     matrix = input_pose_distance_matrix(input).view(np.ma.MaskedArray)
     matrix.mask = np.identity(len(matrix), dtype=np.bool)
-    matrix.fill_value = 0.0
-    input.pose_radii.__init__(tuple(map(np.min, matrix)))
+
+    data = []
+    for row in matrix:
+        row = row.compressed()
+        data.append(0.0 if len(row) == 0 else np.min(row))
+
+    input.pose_radii.__init__(data)
+
+
+def input_pose_data_append(input: RBFDriverInput) -> None:
+    """
+    """
+    if DEBUG:
+        assert isinstance(input, RBFDriverInput)
+
+    for variable in input.variables:
+        variable.data.data__internal__.add()["value"] = variable.value
 
 
 def input_pose_data_update(input: RBFDriverInput, pose_index: int) -> None:
+    """
+    """
+    if DEBUG:
+        assert isinstance(input, RBFDriverInput)
+        assert isinstance(pose_index, int)
+        assert pose_index >= 0
+
     for variable in input.variables:
-        variable.data[pose_index]["value"] = variable.value
+        try:
+            variable.data[pose_index]["value"] = variable.value
+        except IndexError:
+            log.warning((f'{variable} data does not exist to update at {pose_index}. Filling '
+                         f'intermediate values with default {variable.default}'), exc_info=True)
+
+            while pose_index > len(variable.data):
+                variable.data.data__internal__.add()["value"] = variable.default
+
+            variable.data.data__internal__.add()["value"] = variable.value
+
+
+def input_pose_data_remove(input: RBFDriverInput, pose_index: int) -> None:
+    """
+    """
+    if DEBUG:
+        assert isinstance(input, RBFDriverInput)
+        assert isinstance(pose_index, int)
+        assert pose_index >= 0
+
+    for variable in input.variables:
+        # bpy_prop_collection.remove() does not raise excpetions if index is out of bounds.
+        variable.data.data__internal__.remove(pose_index)
 
 
 def input_pose_distance_driver_update_xyz(driver: Driver,
-                                  input: RBFDriverInput,
-                                  pose_index: int,
-                                  transform_type: str,
-                                  **target_props: Dict[str, Any]) -> None:
+                                          input: RBFDriverInput,
+                                          variables: Sequence[RBFDriverInputVariable],
+                                          pose_index: int,
+                                          transform_type: str,
+                                          **target_props: Dict[str, Any]) -> None:
+    """
+    Builds a pose distance driver based on a 3D Euclidean distance metric. Note that the driver
+    variables are assumed to be empty and that there must be 3 and only 3 input variables supplied.
+    """
+    if DEBUG:
+        assert isinstance(driver, Driver)
+        assert len(driver.variables) == 0
+        assert isinstance(input, RBFDriverInput)
+        assert pose_index >= 0
+        assert transform_type in {'LOC', 'ROT', 'SCALE'}
 
-    if len(input.variables) != 3:
-        raise RuntimeError()
+    if len(variables) != 3:
+        log.error((f'Expected variable count to be 3 when updating {input.type.lower()} '
+                   f'XYZ pose distance driver, not {len(variables)}. Reverting to '
+                   f'generic pose distance driver implementation.'), stack_info=True)
+        input_pose_distance_driver_update_generic(driver, input, pose_index)
+        return
 
     params = []
 
-    for axis, input_variable in zip('XYZ', input.variables):
+    for axis, input_variable in zip('XYZ', variables):
         if input_variable.enabled:
             driver_variable = driver.variables.new()
             driver_variable.type = 'TRANSFORMS'
@@ -1214,8 +1793,22 @@ def input_pose_distance_driver_update_xyz(driver: Driver,
             for key, value in target_props.items():
                 setattr(driver_target, key, value)
 
-            params.append((driver_variable.name, str(input_variable.data[pose_index].value)))
+            try:
+                value = input_variable.data[pose_index].value
+            except IndexError:
+                # If the program reaches this point something has gone wrong with the pose data
+                # synchronization. Recover gracefully by using the input variable's default value
+                # but log an error since this will likely not produce the expected interpolation.
+                value = input_variable.default
+                log.error((f'No data found at pose index {pose_index} '
+                           f'for {input_variable}. Reverting to default value {value}'), exc_info=True)
 
+            params.append((driver_variable.name, str(value)))
+
+    # In practice there should always be at least one data value for each variable given that RBF Drivers
+    # automatically creates and fills a 'Rest' pose. However, in the case that no variables are enabled,
+    # as is the case when creating new inputs, the list of parameters will be empty. In this case fallback
+    # the driver will fallback to a zero output value.
     if params:
         driver.expression = f'sqrt({"+".join("pow("+a+"-"+b+",2.0)" for a, b in params)})'
     else:
@@ -1223,21 +1816,87 @@ def input_pose_distance_driver_update_xyz(driver: Driver,
 
 
 def input_pose_distance_driver_update_location(driver: Driver, input: RBFDriverInput, pose_index: int) -> None:
-    return input_pose_distance_driver_update_xyz(driver, input, pose_index, 'LOC')
+    """
+    Builds a pose distance driver based on a 3D Euclidean distance metric. Note that the driver
+    variables are assumed to be empty. Internally uses input_pose_distance_driver_update_xyz to
+    do the work.
+    """
+    if DEBUG:
+        assert isinstance(driver, Driver)
+        assert len(driver.variables) == 0
+        assert isinstance(input, RBFDriverInput)
+        assert input.type == 'LOCATION'
+        assert pose_index >= 0
+
+    return input_pose_distance_driver_update_xyz(driver, input, input.variables, pose_index, 'LOC')
 
 
 def input_pose_distance_driver_update_scale(driver: Driver, input: RBFDriverInput, pose_index: int) -> None:
-    return input_pose_distance_driver_update_xyz(driver, input, pose_index, 'SCALE')
+    """
+    Builds a pose distance driver based on a 3D Euclidean distance metric. Note that the driver
+    variables are assumed to be empty. Internally uses input_pose_distance_driver_update_xyz to
+    do the work.
+    """
+    if DEBUG:
+        assert isinstance(driver, Driver)
+        assert len(driver.variables) == 0
+        assert isinstance(input, RBFDriverInput)
+        assert input.type == 'SCALE'
+        assert pose_index >= 0
+
+    return input_pose_distance_driver_update_xyz(driver, input, input.variables, pose_index, 'SCALE')
 
 
-def input_pose_distance_driver_update_rotation_euler(driver: Driver, input: RBFDriverInput, pose_index: int, rotation_mode: str) -> None:
-    return input_pose_distance_driver_update_xyz(driver, input, pose_index, 'ROT', rotation_mode=rotation_mode)
+def input_pose_distance_driver_update_rotation_euler(driver: Driver, input: RBFDriverInput, pose_index: int) -> None:
+    """
+    Builds a pose distance driver based on a 3D Euclidean distance metric. Note that the driver
+    variables are assumed to be empty. Internally uses input_pose_distance_driver_update_xyz to
+    do the work.
+    """
+    if DEBUG:
+        assert isinstance(driver, Driver)
+        assert len(driver.variables) == 0
+        assert isinstance(input, RBFDriverInput)
+        assert input.type == 'ROTATION'
+        assert len(input.rotation_mode) < 5
+        assert pose_index >= 0
+
+    # TODO An alternative distance metric could be devised for euler rotations based on dividing
+    # the radians by pi in order to produce a normalized rotational difference.
+    return input_pose_distance_driver_update_xyz(driver,
+                                                 input,
+                                                 input.variables[1:],
+                                                 pose_index,
+                                                 'ROT',
+                                                 rotation_mode=input.rotation_mode)
 
 
 def input_pose_distance_driver_update_rotation_swing(driver: Driver, input: RBFDriverInput, pose_index: int) -> None:
+    """
+    Builds a pose distance driver based on a 3D rotational difference that ignores the twist
+    component of a quaternion input value. Note that the driver variables are assumed to be empty.
+    """
+    if DEBUG:
+        assert isinstance(driver, Driver)
+        assert len(driver.variables) == 0
+        assert isinstance(input, RBFDriverInput)
+        assert input.type == 'ROTATION'
+        assert input.rotation_mode.startswith('SWING')
+        assert isinstance(pose_index, int)
+        assert pose_index >= 0
+
+    input_variables = input.variables
+
+    if len(input_variables) != 4:
+        log.error((f'Expected {input_variables} length to be 4 when updating swing rotation '
+                   f'pose distance driver, not {len(input_variables)}. Reverting to generic '
+                   f'pose distance driver implementation.'), stack_info=True)
+        input_pose_distance_driver_update_generic(driver, input, pose_index)
+        return
+
     params = []
 
-    for axis, input_variable in zip('WXYZ', input.variables):
+    for axis, input_variable in zip('WXYZ', input_variables):
         driver_variable = driver.variables.new()
         driver_variable.type = 'TRANSFORMS'
         driver_variable.name = axis.lower()
@@ -1251,7 +1910,17 @@ def input_pose_distance_driver_update_rotation_swing(driver: Driver, input: RBFD
         driver_target.rotation_mode = 'QUATERNION'
         driver_target.transform_space = input_target.transform_space
 
-        params.append(input_variable.data[pose_index].value)
+        try:
+            value = input_variable.data[pose_index].value
+        except IndexError:
+            # If the program reaches this point something has gone wrong with the pose data
+            # synchronization. Recover gracefully by using the input variable's default value
+            # but log an error since this will likely not produce the expected interpolation.
+            value = input_variable.default
+            log.error((f'No data found at pose index {pose_index} for {input_variable}. Reverting '
+                       f'to default value {value}'), exc_info=True)
+
+        params.append(value)
 
     if not params:
         driver.expression = "0.0"
@@ -1280,8 +1949,19 @@ def input_pose_distance_driver_update_rotation_swing(driver: Driver, input: RBFD
 
 
 def input_pose_distance_driver_update_rotation_twist(driver: Driver, input: RBFDriverInput, pose_index: int) -> None:
+    """
+    Builds a pose distance driver based on the absolute difference in the twist component of an
+    input rotation value. Note that the driver variables are assumed to be empty.
+    """
+    if DEBUG:
+        assert isinstance(driver, Driver)
+        assert isinstance(input, RBFDriverInput)
+        assert input.type == 'ROTATION'
+        assert input.rotation_mode.startswith('TWIST')
+        assert pose_index >= 0
+
     axis = input.rotation_mode[-1]
-    input_variable = input.varibles['WXYZ'.index(axis)]
+    input_variable = input.variables['WXYZ'.index(axis)]
 
     driver_variable = driver.variables.new()
     driver_variable.type = 'TRANSFORMS'
@@ -1297,12 +1977,43 @@ def input_pose_distance_driver_update_rotation_twist(driver: Driver, input: RBFD
     driver_target.transform_space = input_target.transform_space
 
     driver.type = 'SCRIPTED'
-    driver.expression = f'fabs({driver_variable.name}-{str(input_variable.data[pose_index].value)})/pi'
+
+    try:
+        value = input_variable.data[pose_index].value
+    except IndexError:
+        # If the program reaches this point something has gone wrong with the pose data
+        # synchronization. Recover gracefully by using the input variable's default value
+        # but log an error since this will likely not produce the expected interpolation.
+        value = input_variable.default
+        log.error((f'No data found at pose index {pose_index} for {input_variable}. Reverting '
+                   f'to default value {value}'), exc_info=True)
+
+    driver.expression = f'fabs({driver_variable.name}-{str(value)})/pi'
 
 
-def input_pose_distance_driver_update_rotation_quaternion(driver: Driver, input: RBFDriverInput, index: int) -> None:
+def input_pose_distance_driver_update_rotation_quaternion(driver: Driver, input: RBFDriverInput, pose_index: int) -> None:
+    """
+    Builds a pose distance driver based on the quaternion distance in the of an input rotation
+    value. Note that the driver variables are assumed to be empty.
+    """
+    if DEBUG:
+        assert isinstance(driver, Driver)
+        assert isinstance(input, RBFDriverInput)
+        assert input.type == 'ROTATION'
+        assert input.rotation_mode == 'QUATERNION'
+        assert pose_index >= 0
+
+    variables = input.variables
+
+    if len(variables) != 4:
+        log.error((f'Expected variable count to be 4 when updating {input.type.lower()} '
+                   f'QUATERNION pose distance driver, not {len(variables)}. Reverting to '
+                   f'generic pose distance driver implementation.'), stack_info=True)
+        input_pose_distance_driver_update_generic(driver, input, pose_index)
+        return
+
     params = []
-    for axis, input_variable in zip('WXYZ', input.variables):
+    for axis, input_variable in zip('WXYZ', variables):
 
         driver_variable = driver.variables.new()
         driver_variable.type = 'TRANSFORMS'
@@ -1317,56 +2028,75 @@ def input_pose_distance_driver_update_rotation_quaternion(driver: Driver, input:
         driver_target.rotation_mode = 'QUATERNION'
         driver_target.transform_space = input_target.transform_space
 
-        params.append((driver_variable.name, str(input_variable.data[index].value)))
+        try:
+            value = input_variable.data[pose_index].value
+        except IndexError:
+            # If the program reaches this point something has gone wrong with the pose data
+            # synchronization. Recover gracefully by using the input variable's default value
+            # but log an error since this will likely not produce the expected interpolation.
+            value = input_variable.default
+            log.error((f'No data found at pose index {pose_index} for {input_variable}. '
+                       f'Reverting to default value {value}'), exc_info=True)
 
-    driver.expression = f'acos((2.0*pow(clamp({"+".join(["*".join(x) for x in params])},-1.0,1.0),2.0))-1.0)/pi'
+        params.append((driver_variable.name, str(value)))
+
+    driver.expression = (f'acos((2.0*pow(clamp('
+                         f'{"+".join(["*".join(x) for x in params])}'
+                         f',-1.0,1.0),2.0))-1.0)/pi')
 
 
-def input_pose_distance_driver_update_bbone(driver: Driver, input: RBFDriverInput, index: int) -> None:
+def input_pose_distance_driver_update_generic(driver: Driver, input: RBFDriverInput, pose_index: int) -> None:
+    """
+    Builds a pose distance driver based on the euclidean distance in the input data values.
+    Note that the driver variables are assumed to be empty.
+    """
     params = []
     varkeys = DriverVariableNameGenerator()
 
-    for input_variable in input.variables:
-        if input_variable.enabled:
-            driver_variable = driver.variables.new()
-            driver_variable.type = input_variable.type
-            driver_variable.name = next(varkeys)
-
-            for input_target, driver_target in zip(input_variable.targets, driver_variable.targets):
-                driver_target.id = input_target.object
-                driver_target.data_path = input_target.data_path
-
-            data = [scalar.value for scalar in input_variable.data]
-            norm = np.linalg.norm(data)
-            params.append((driver_variable.name, str(data[index] / norm if norm != 0.0 else data[index]), str(norm)))
-
-    if params:
-        driver.expression = f'sqrt({"+".join("pow("+a+("" if n==0.0 else "/"+str(n))+"-"+b+",2.0)" for a, b, n in params)})'
-    else:
-        driver.expression = "0.0"
-
-
-def input_pose_distance_driver_update_generic(driver: Driver, input: RBFDriverInput, index: int) -> None:
-    params = []
-    varkeys = DriverVariableNameGenerator()
-
-    for input_variable in input.variables:
+    for input_variable in filter(input_variable_is_enabled, input.variables):
         driver_variable = driver.variables.new()
         driver_variable.type = input_variable.type
         driver_variable.name = next(varkeys)
 
-        for input_target, driver_target in zip(input_variable.targets, driver_variable.targets):
+        if input_variable.type == 'SINGLE_PROP':
             driver_target.id_type = input_target.id_type
             driver_target.id = input_target.id
+            driver_target.data_path = input_target.data_path
+        
+        elif input_variable.type == 'TRANSFORMS':
+            driver_target.id = input_target.object
             driver_target.bone_target = input_target.bone_target
             driver_target.rotation_mode = input_target.rotation_mode
             driver_target.transform_type = input_target.transform_type
             driver_target.transform_space = input_target.transform_space
-            driver_target.data_path = input_target.data_path
+
+        else:
+            for input_target, driver_target in zip(input_variable.targets, driver_variable.targets):
+                driver_target.id = input_target.object
+                driver_target.bone_target = input_target.bone_target
+                driver_target.transform_space = input_target.transform_space
+
+        # Given the potentially disparate nature of the input values, the normalization
+        # can't be handled in the FCurve, instead the pose data values themselves need to be
+        # normalized in order to ensure that larger value ranges don't skew the interpolation
+        # results.
+        
+        if pose_index >= len(input_variable.data):
+            # If the program reaches this point something has gone wrong with the pose data
+            # synchronization. Recover gracefully by using the input variable's default value
+            # but log an error since this will likely not produce the expected interpolation.
+            log.error((f'No data found at pose index {pose_index} for {input_variable}. '
+                       f'Filling with default value {input_variable.default}'), stack_info=True)
+
+            while pose_index >= len(input_variable.data):
+                input_variable.data.data__internal__.add()["value"] = input_variable.default
 
         data = [scalar.value for scalar in input_variable.data]
         norm = np.linalg.norm(data)
-        params.append((driver_variable.name, str(data[index] / norm if norm != 0.0 else data[index]), norm))
+        if norm != 0.0:
+            data = [value / norm for value in data]
+
+        params.append((driver_variable.name, str(data[pose_index]), str(norm)))
 
     if params:
         driver.expression = f'sqrt({"+".join("pow("+a+("" if n==0.0 else "/"+str(n))+"-"+b+",2.0)" for a, b, n in params)})'
@@ -1375,21 +2105,58 @@ def input_pose_distance_driver_update_generic(driver: Driver, input: RBFDriverIn
 
 
 def input_pose_distance_idprop_update(input: RBFDriverInput, pose_count: int) -> None:
+    """
+    Updates the IDPropertyArray used to hold the driven input pose distance properties,
+    ensuring that the array contains the number of elements corresponding to the pose_count.
+    """
+    if DEBUG:
+        assert isinstance(input, RBFDriverInput)
+        assert isinstance(pose_count, int)
+        assert pose_count > 0
+
     input.id_data.data[input.pose_distance_property_name] = [0.0] * pose_count
 
 
 def input_pose_distance_idprop_remove(input: RBFDriverInput) -> None:
+    """
+    Removes the IDPropertyArray used to hold the driven input pose distance properties.
+    """
+    if DEBUG:
+        assert isinstance(input, RBFDriverInput)
+
     try:
         del input.id_data.data[input.pose_distance_property_name]
     except KeyError: pass
 
 
 def input_pose_distance_idprop_update_all(inputs: RBFDriverInputs, pose_count: int) -> None:
+    """
+    Updates the IDPropertyArray used to hold the driven input pose distance properties for each
+    input in the collection.
+    """
+    if DEBUG:
+        assert isinstance(inputs, RBFDriverInputs)
+        assert pose_count > 0
+
     for input in inputs:
         input_pose_distance_idprop_update(input, pose_count)
 
 
 def input_pose_distance_driver_update(input: RBFDriverInput, pose_index: int) -> None:
+    """
+    Rebuilds the pose distance driver for the input at the given pose index. This should be the
+    entry point when updating a pose distance driver as it dispatches to the suitable pose distance
+    driver implementation internally. Note that the driven property (at
+    input.pose_distance_property_name) is neither updated nor validated by this function.
+    Operations on the RBF driver that should result in changes to that property (such as
+    adding/removing poses) should update that property using input_pose_distance_idprop_update()
+    before calling this function.
+    """
+    if DEBUG:
+        assert isinstance(input, RBFDriverInput)
+        assert isinstance(pose_index, int)
+        assert pose_index >= 0
+
     fcurve = driver_ensure(input.id_data.data, input.pose_distance_property_path, pose_index)
     driver = fcurve.driver
     driver.type = 'SCRIPTED'
@@ -1398,39 +2165,70 @@ def input_pose_distance_driver_update(input: RBFDriverInput, pose_index: int) ->
     input_type = input.type
 
     if input_type == 'LOCATION':
-        return input_pose_distance_driver_update_location(driver, input, pose_index)
+        input_pose_distance_driver_update_location(driver, input, pose_index)
+        return
 
     if input_type == 'ROTATION':
         rotation_mode = input.rotation_mode
 
-        if len(rotation_mode) < 5:
-            return input_pose_distance_driver_update_rotation_euler(driver, input, pose_index, rotation_mode=rotation_mode)
+        if len(rotation_mode) < 5: # Euler rotations (AUTO, XYZ, etc.)
+            input_pose_distance_driver_update_rotation_euler(driver, input, pose_index)
+            return
+
         if rotation_mode == 'QUATERNION':
-            return input_pose_distance_driver_update_rotation_quaternion(driver, input, pose_index)
+            input_pose_distance_driver_update_rotation_quaternion(driver, input, pose_index)
+            return
+
         if rotation_mode.startswith('SWING'):
-            return input_pose_distance_driver_update_rotation_swing(driver, input, pose_index)
+            input_pose_distance_driver_update_rotation_swing(driver, input, pose_index)
+            return
+
         if rotation_mode.startswith('TWIST'):
-            return input_pose_distance_driver_update_rotation_twist(driver, input, pose_index)
+            input_pose_distance_driver_update_rotation_twist(driver, input, pose_index)
+            return
 
     if input_type == 'SCALE':
-        return input_pose_distance_driver_update_scale(driver, input, pose_index)
+        input_pose_distance_driver_update_scale(driver, input, pose_index)
+        return
 
-    if input_type == 'BBONE':
-        return input_pose_distance_driver_update_bbone(driver, input, pose_index)
-
-    return input_pose_distance_driver_update_generic(driver, input, pose_index)
+    # Other input types (BBONE, SHAPE_KEY, etc.) are handled under the generic pose distance driver
+    # implementation which uses a euclidean distance metric across normalized data values.
+    input_pose_distance_driver_update_generic(driver, input, pose_index)
 
 
 def input_pose_distance_driver_update_all(input: RBFDriverInput, pose_count: int) -> None:
+    """
+    Rebuilds the pose distance driver for each input in the collection, at every pose index up to
+    pose_count.
+    """
+    if DEBUG:
+        assert isinstance(input, RBFDriverInput)
+        assert isinstance(pose_count, int)
+        assert pose_count > 0
+
     for pose_index in range(pose_count):
         input_pose_distance_driver_update(input, pose_index)
 
 
 def input_pose_distance_driver_remove(input: RBFDriverInput, pose_index: int) -> None:
+    """
+    Removes the pose distance driver for the input at the given pose_index.
+    """
+    if DEBUG:
+        assert isinstance(input, RBFDriverInput)
+        assert isinstance(pose_index, int)
+        assert pose_index >= 0
+
     driver_remove(input.id_data.data, input.pose_distance_property_path, pose_index)
 
 
 def input_pose_distance_driver_remove_all(input: RBFDriverInput) -> None:
+    """
+    Removes all pose distance drivers for the input.
+    """
+    if DEBUG:
+        assert isinstance(input, RBFDriverInput)
+
     animdata = input.id_data.animation_data
     if animdata:
         data_path = input.pose_distance_property_path

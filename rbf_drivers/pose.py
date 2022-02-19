@@ -1,15 +1,21 @@
 
-from typing import Any, Iterator, List, Optional, Tuple, Union, TYPE_CHECKING
+from typing import Any, Dict, Iterator, List, Optional, Tuple, Union, TYPE_CHECKING
+import sys
+import logging
 from bpy.types import PropertyGroup
-from bpy.props import BoolProperty, CollectionProperty, FloatProperty, IntProperty, PointerProperty, StringProperty
+from bpy.props import BoolProperty, CollectionProperty, EnumProperty, FloatProperty, IntProperty, PointerProperty, StringProperty
+from rbf_drivers.lib.rotation_utils import euler_to_quaternion, swing_twist_to_quaternion
 from .lib.driver_utils import driver_ensure, driver_remove, driver_variables_clear
 from .lib.curve_mapping import BCLMAP_CurveManager, BLCMAP_Curve, keyframe_points_assign, to_bezier
-from .mixins import Identifiable
-from .input import RBFDriverInputs, input_pose_data_update, input_pose_distance_fcurve_update_all, input_pose_radii_update
+from .mixins import LAYER_TYPE_ITEMS, Identifiable, Symmetrical
+from .input import RBFDriverInputs, input_pose_data_update, input_pose_distance_driver_update, input_pose_distance_fcurve_update_all, input_pose_radii_update
 
 if TYPE_CHECKING:
     from .driver import RBFDriver
 
+DEBUG = 'DEBUG_MODE' in sys.argv
+
+log = logging.getLogger('rbf_drivers')
 
 def pose_falloff_radius_update_handler(falloff: 'RBFDriverPoseFalloff', _) -> None:
     if falloff.enabled:
@@ -47,6 +53,7 @@ class RBFDriverPoseFalloff(BCLMAP_CurveManager, PropertyGroup):
         )
 
     def update(self, _=None) -> None:
+        super().update()
         pose = self.pose
         driver = pose.rbf_driver
         pose_weight_fcurve_update(driver.poses,
@@ -54,6 +61,28 @@ class RBFDriverPoseFalloff(BCLMAP_CurveManager, PropertyGroup):
                                   driver.falloff.radius,
                                   driver.falloff.curve,
                                   driver.type == 'SHAPE_KEYS')
+
+        if pose.has_symmetry_target:
+            m_pose = pose_symmetry_target(pose)
+            if m_pose is None:
+                log.warning(f'Search failed for symmetry target of {driver}.')
+            else:
+                driver = m_pose.rbf_driver
+                if not driver.symmetry_lock__internal__:
+                    driver.symmetry_lock__internal__ = True
+                    try:
+                        falloff = m_pose.falloff
+                        falloff["radius"] = self.radius
+                        falloff["curve_type"] = self.get("curve_type")
+                        falloff["easing"] = self.get("easing")
+                        falloff["interpolation"] = self.get("interpolation")
+                        falloff["offset"] = self.offset
+                        falloff["ramp"] = self.ramp
+                        falloff.curve.__init__(self.curve)
+                        falloff.update()
+                    finally:
+                        driver.symmetry_lock__internal__ = False
+
 
 
 def pose_name_get(pose: 'RBFDriverPose') -> str:
@@ -89,7 +118,7 @@ def pose_name_set(pose: 'RBFDriverPose', value: str) -> None:
     pose["name"] = value
 
 
-class RBFDriverPose(Identifiable, PropertyGroup):
+class RBFDriverPose(Symmetrical, PropertyGroup):
 
     falloff: PointerProperty(
         name="Falloff",
@@ -110,16 +139,28 @@ class RBFDriverPose(Identifiable, PropertyGroup):
         path: str = self.path_from_id()
         return self.id_data.path_resolve(path.rpartition(".poses.")[0])
 
-    def update(self) -> None:
-        driver = self.rbf_driver
-        poses = driver.poses
-        pose_index = poses.find(self.name)
-        pose_count = len(poses)
+
+def poses_active_index_update_handler(poses: 'RBFDriverPoses', _) -> None:
+    pose = poses.active
+
+    if pose is not None:
+        driver = pose.rbf_driver
+        pose_index = poses.active_index
 
         for input in driver.inputs:
-            input_pose_data_update(input, pose_index)
-            input_pose_radii_update(input)
-            input_pose_distance_fcurve_update_all(input, pose_count)
+            input.active_pose.__init__(input, pose_index)
+
+        for output in driver.outputs:
+            output.active_pose.__init__(output, pose_index)
+
+    else:
+        driver = poses.id_data.path_resolve(poses.path_from_id().rpartition(".")[0])
+
+        for input in driver.inputs:
+            input.active_pose.data__internal__.clear()
+
+        for output in driver.outputs:
+            output.active_pose.data__internal__.clear()
 
 
 class RBFDriverPoses(Identifiable, PropertyGroup):
@@ -130,6 +171,7 @@ class RBFDriverPoses(Identifiable, PropertyGroup):
         min=0,
         default=0,
         options=set(),
+        update=poses_active_index_update_handler
         )
 
     @property
@@ -182,12 +224,37 @@ class RBFDriverPoses(Identifiable, PropertyGroup):
     def items(self) -> List[Tuple[str, RBFDriverPose]]:
         return self.collection__internal__.items()
 
+    def search(self, identifier: str) -> Optional[RBFDriverPose]:
+        return next((pose for pose in self if pose.identifier == identifier), None)
+
     def values(self) -> List[RBFDriverPose]:
         return list(self)
 
 #
 #
 #
+
+
+def pose_symmetry_target(pose: RBFDriverPose) -> Optional[RBFDriverPose]:
+    """
+    """
+    driver = pose.rbf_driver
+    if not driver.has_symmetry_target:
+        log.warning(f'Symmetry target defined for component {pose} but not for {driver}')
+        return
+
+    m_driver = driver.id_data.rbf_drivers.search(driver.symmetry_identifier)
+    if m_driver is None:
+        log.warning(f'Search failed for symmetry target of {driver}.')
+        return
+
+    return m_driver.poses.search(pose.symmetry_identifier)
+
+
+def pose_symmetry_assign(a: RBFDriverPose, b: RBFDriverPose) -> None:
+    a["symmetry_identifier"] = b.identifier
+    b["symmetry_identifier"] = a.identifier
+
 
 def pose_distance_sum_idprop_update(poses: RBFDriverPoses) -> None:
     poses.id_data.data[poses.summed_distances_property_name] = [0.0] * len(poses)
@@ -355,7 +422,7 @@ def pose_weight_driver_remove_all(poses: RBFDriverPoses,
                                   shape_keys: Optional[bool]=None) -> None:
     """
     """
-    for pose_index in len(range(poses)):
+    for pose_index in range(len(poses)):
         pose_weight_driver_remove(poses, pose_index, shape_keys)
 
 #

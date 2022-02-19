@@ -3,17 +3,19 @@
 ###################################################################################################
 
 from typing import Any, Iterator, List, Optional, Tuple, Union
-
+import logging
 from bpy.types import PropertyGroup
-from bpy.props import (CollectionProperty,
+from bpy.props import (BoolProperty,
+                       CollectionProperty,
                        EnumProperty,
                        FloatProperty,
                        IntProperty,
                        PointerProperty)
 
 from .lib.curve_mapping import BCLMAP_CurveManager
+from .lib.symmetry import symmetrical_target
 
-from .mixins import Identifiable
+from .mixins import Symmetrical
 
 from .input import (RBFDriverInputs, input_influence_sum_driver_update, input_influence_sum_idprop_ensure,
                     input_pose_distance_driver_update_all,
@@ -35,6 +37,8 @@ from .output import RBFDriverOutputs
 
 #region Configuration
 ###################################################################################################
+
+log = logging.getLogger("rbf_drivers")
 
 DRIVER_TYPE_ITEMS = [
     ('NONE'      , "Generic"   , "", 'DRIVER'       , 0),
@@ -74,6 +78,7 @@ class RBFDriverFalloff(BCLMAP_CurveManager, PropertyGroup):
         return self.id_data.path_resolve(path.rpartition(".")[0])
 
     def update(self, _=None) -> None:
+        super().update()
         driver = self.rbf_driver
         radius = self.radius
         curve = self.curve
@@ -84,8 +89,27 @@ class RBFDriverFalloff(BCLMAP_CurveManager, PropertyGroup):
             if not pose.falloff.enabled:
                 pose_weight_fcurve_update(poses, index, radius, curve, shape)
 
+        if driver.has_symmetry_target and not driver.symmetry_lock__internal__:
+            mirror: RBFDriver = driver.id_data.rbf_drivers.search(driver.symmetry_identifier)
+            if mirror is None:
+                log.warning(f'Search failed for symmetry target of {driver}.')
+            else:
+                mirror.symmetry_lock__internal__ = True
+                try:
+                    falloff = mirror.falloff
+                    falloff["radius"] = self.radius
+                    falloff["curve_type"] = self.get("curve_type")
+                    falloff["easing"] = self.get("easing")
+                    falloff["interpolation"] = self.get("interpolation")
+                    falloff["offset"] = self.offset
+                    falloff["ramp"] = self.ramp
+                    falloff.curve.__init__(self.curve)
+                    falloff.update()
+                finally:
+                    mirror.symmetry_lock__internal__ = False
 
-class RBFDriver(Identifiable, PropertyGroup):
+
+class RBFDriver(Symmetrical, PropertyGroup):
 
     falloff: PointerProperty(
         name="Falloff",
@@ -115,11 +139,21 @@ class RBFDriver(Identifiable, PropertyGroup):
     def reference_pose(self) -> Optional[RBFDriverPose]:
         return self.poses[0] if len(self.poses) else None
 
+    symmetry_lock__internal__: BoolProperty(
+        default=False,
+        options=set()
+        )
+
     type: EnumProperty(
         items=DRIVER_TYPE_ITEMS,
         get=lambda self: self.get("type", 0),
         options=set()
         )
+
+    def get_symmetry_target(self) -> Optional['RBFDriver']:
+        name = symmetrical_target(self.name)
+        if name:
+            return self.id_data.rbf_drivers.get(name)
 
     def update(self) -> None:
 
@@ -196,6 +230,9 @@ class RBFDrivers(PropertyGroup):
 
     def items(self) -> List[Tuple[str, RBFDriver]]:
         return self.collection__internal__.items()
+
+    def search(self, identifier: str) -> Optional[RBFDriver]:
+        return next((driver for driver in self if driver.identifier == identifier), None)
 
     def values(self) -> List[RBFDriver]:
         return list(self)
