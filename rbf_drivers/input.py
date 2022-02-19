@@ -338,7 +338,6 @@ INPUT_VARIABLE_DEFINITIONS = {
         "name": "var",
         "targets": [{}]
         }
-        NR34HY, 285 SPROWSTON ROAD
     ],
     'LOCATION': [
         {
