@@ -1,11 +1,11 @@
 
-from typing import Any, Dict, Iterator, List, Optional, Tuple, Union, TYPE_CHECKING
+from typing import Any, Dict, Iterator, List, Optional, Sequence, Tuple, Union, TYPE_CHECKING
 import sys
 import logging
 from bpy.types import PropertyGroup
 from bpy.props import BoolProperty, CollectionProperty, EnumProperty, FloatProperty, IntProperty, PointerProperty, StringProperty
 from rbf_drivers.lib.rotation_utils import euler_to_quaternion, swing_twist_to_quaternion
-from .lib.driver_utils import driver_ensure, driver_remove, driver_variables_clear
+from .lib.driver_utils import DriverVariableNameGenerator, driver_ensure, driver_remove, driver_variables_clear
 from .lib.curve_mapping import BCLMAP_CurveManager, BLCMAP_Curve, keyframe_points_assign, to_bezier
 from .mixins import LAYER_TYPE_ITEMS, Identifiable, Symmetrical
 from .input import RBFDriverInputs, input_pose_data_update, input_pose_distance_driver_update, input_pose_distance_fcurve_update_all, input_pose_radii_update
@@ -139,6 +139,14 @@ class RBFDriverPose(Symmetrical, PropertyGroup):
         path: str = self.path_from_id()
         return self.id_data.path_resolve(path.rpartition(".poses.")[0])
 
+    @property
+    def variable_property_name(self) -> str:
+        return f'rbfp_vars_{self.identifier}'
+
+    @property
+    def variable_property_path(self) -> str:
+        return f'["{self.variable_property_name}"]'
+
 
 def poses_active_index_update_handler(poses: 'RBFDriverPoses', _) -> None:
     pose = poses.active
@@ -185,6 +193,14 @@ class RBFDriverPoses(Identifiable, PropertyGroup):
         )
 
     @property
+    def normalized_weight_property_name(self) -> str:
+        return f'rbfp_nwgt_{self.identifier}'
+
+    @property
+    def normalized_weight_property_path(self) -> str:
+        return f'["{self.normalized_weight_property_name}"]'
+
+    @property
     def weight_property_name(self) -> str:
         return f'rbfp_wgts_{self.identifier}'
 
@@ -199,6 +215,14 @@ class RBFDriverPoses(Identifiable, PropertyGroup):
     @property
     def summed_distances_property_path(self) -> str:
         return f'["{self.summed_distances_property_name}"]'
+
+    @property
+    def summed_weight_property_name(self) -> str:
+        return f'rbfp_swgt_{self.identifier}'
+
+    @property
+    def summed_weight_property_path(self) -> str:
+        return f'["{self.summed_weight_property_name}"]'
 
     def __len__(self) -> int:
         return len(self.collection__internal__)
@@ -233,7 +257,6 @@ class RBFDriverPoses(Identifiable, PropertyGroup):
 #
 #
 #
-
 
 def pose_symmetry_target(pose: RBFDriverPose) -> Optional[RBFDriverPose]:
     """
@@ -295,6 +318,23 @@ def pose_distance_sum_driver_update_all(poses: RBFDriverPoses, inputs: RBFDriver
 def pose_distance_sum_driver_remove_all(poses: RBFDriverPoses) -> None:
     for pose_index in range(len(poses)):
         pose_distance_sum_driver_remove(poses, pose_index)
+
+#
+#
+#
+
+def pose_variable_idprop_update(pose: RBFDriverPose, data: Sequence[float]) -> None:
+    print(pose.id_data.data)
+    print(pose.variable_property_name)
+    print(pose)
+    print(data)
+    # pose.id_data.data[pose.variable_property_name] = data
+
+
+def pose_variable_idprop_remove(pose: RBFDriverPose) -> None:
+    try:
+        del pose.id_data.data[pose.variable_property_name]
+    except KeyError: pass
 
 #
 #
@@ -362,26 +402,59 @@ def pose_weight_driver_update(poses: RBFDriverPoses,
     if fcurve:
         driver = fcurve.driver
         driver.type = 'SCRIPTED'
-        driver.expression = '0.0 if influence == 0.0 else distance / influence'
         driver_variables_clear(driver.variables)
 
-        variable = driver.variables.new()
-        variable.type = 'SINGLE_PROP'
-        variable.name = "distance"
+        varkey = DriverVariableNameGenerator()
+        tokens = []
 
-        target = variable.targets[0]
-        target.id_type = poses.id_data.type
-        target.id = poses.id_data.data
-        target.data_path = f'{poses.summed_distances_property_path}[{pose_index}]'
+        pose = poses[pose_index]
 
-        variable = driver.variables.new()
-        variable.type = 'SINGLE_PROP'
-        variable.name = "influence"
+        for index in range(len(poses)):
+            distance = driver.variables.new()
+            distance.type = 'SINGLE_PROP'
+            distance.name = next(varkey)
 
-        target = variable.targets[0]
-        target.id_type = inputs.id_data.type
-        target.id = inputs.id_data.data
-        target.data_path = inputs.summed_influence_property_path
+            target = distance.targets[0]
+            target.id_type = pose.id_data.type
+            target.id = pose.id_data.data
+            target.data_path = f'{poses.summed_distances_property_path}[{index}]'
+
+            variable = driver.variables.new()
+            variable.type = 'SINGLE_PROP'
+            variable.name = next(varkey)
+
+            target = variable.targets[0]
+            target.id_type = pose.id_data.type
+            target.id = pose.id_data.data
+            target.data_path = f'{pose.variable_property_path}[{index}]'
+
+            tokens.append((distance.name, variable.name))
+
+        driver.expression = f'{"+".join([d+"*"+v for d, v in tokens])}'
+
+    # if fcurve:
+    #     driver = fcurve.driver
+    #     driver.type = 'SCRIPTED'
+    #     driver.expression = 'distance * influence'
+    #     driver_variables_clear(driver.variables)
+
+    #     variable = driver.variables.new()
+    #     variable.type = 'SINGLE_PROP'
+    #     variable.name = "distance"
+
+    #     target = variable.targets[0]
+    #     target.id_type = poses.id_data.type
+    #     target.id = poses.id_data.data
+    #     target.data_path = f'{poses.summed_distances_property_path}[{pose_index}]'
+
+    #     variable = driver.variables.new()
+    #     variable.type = 'SINGLE_PROP'
+    #     variable.name = "influence"
+
+    #     target = variable.targets[0]
+    #     target.id_type = inputs.id_data.type
+    #     target.id = inputs.id_data.data
+    #     target.data_path = inputs.summed_influence_property_path
 
 
 def pose_weight_driver_remove(poses: RBFDriverPoses,
@@ -428,3 +501,86 @@ def pose_weight_driver_remove_all(poses: RBFDriverPoses,
 #
 #
 #
+
+def pose_weight_sum_idprop_update(poses: RBFDriverPoses) -> None:
+    poses.id_data.data[poses.summed_weight_property_name] = 0.0
+
+
+def pose_weight_sum_idprop_remove(poses: RBFDriverPoses) -> None:
+    try:
+        del poses.id_data.data[poses.summed_weight_property_name]
+    except KeyError: pass
+
+
+def pose_weight_sum_driver_update(poses: RBFDriverPoses) -> None:
+    fcurve = driver_ensure(poses.id_data.data, poses.summed_weight_property_path)
+    driver = fcurve.driver
+    driver.type = 'SUM'
+    driver_variables_clear(driver.variables)
+
+    for index in range(len(poses)):
+        variable = driver.variables.new()
+        variable.name = f'var_{str(index+1).zfill(3)}'
+        variable.type = 'SINGLE_PROP'
+
+        target = variable.targets[0]
+        target.id_type = poses.id_data.type
+        target.id = poses.id_data.data
+        target.data_path = f'{poses.weight_property_path}[{index}]'
+
+
+def pose_weight_sum_driver_remove(poses: RBFDriverPoses) -> None:
+    driver_remove(poses.id_data.data, poses.summed_weight_property_path)
+
+#
+#
+#
+
+def pose_weight_normalized_idprop_update(poses: RBFDriverPoses) -> None:
+    poses.id_data.data[poses.normalized_weight_property_name] = [0.0] * len(poses)
+
+
+def pose_weight_normalized_idprop_remove(poses: RBFDriverPoses) -> None:
+    try:
+        del poses.id_data.data[poses.normalized_weight_property_name]
+    except KeyError: pass
+
+
+def pose_weight_normalized_driver_update(poses: RBFDriverPoses, pose_index: int) -> None:
+    fcurve = driver_ensure(poses.id_data.data, poses.normalized_weight_property_path, pose_index)
+    driver = fcurve.driver
+    driver_variables_clear(driver.variables)
+
+    variable = driver.variables.new()
+    variable.type = 'SINGLE_PROP'
+    variable.name = "value"
+
+    target = variable.targets[0]
+    target.id_type = poses.id_data.type
+    target.id = poses.id_data.data
+    target.data_path = f'{poses.weight_property_path}[{pose_index}]'
+
+    variable = driver.variables.new()
+    variable.type = 'SINGLE_PROP'
+    variable.name = "total"
+
+    target = variable.targets[0]
+    target.id_type = poses.id_data.type
+    target.id = poses.id_data.data
+    target.data_path = f'{poses.summed_distances_property_path}[{pose_index}]'
+
+    driver.expression = "0.0 if fabs(total - value) < 0.000001 else value / total"
+
+
+def pose_weight_normalized_driver_remove(poses: RBFDriverPoses, pose_index: int) -> None:
+    driver_remove(poses.id_data.data, poses.normalized_weight_property_path, pose_index)
+
+
+def pose_weight_normalized_driver_update_all(poses: RBFDriverPoses) -> None:
+    for index in range(len(poses)):
+        pose_weight_normalized_driver_update(poses, index)
+
+
+def pose_weight_normalized_driver_remove_all(poses: RBFDriverPoses) -> None:
+    for index in range(len(poses)):
+        pose_weight_normalized_driver_remove(poses, index)

@@ -1247,7 +1247,7 @@ def output_channel_driver_update_dot(output: RBFDriverOutput,
         target = weight.targets[0]
         target.id_type = poses.id_data.type
         target.id = poses.id_data.data
-        target.data_path = f'{poses.weight_property_path}[{pose_index}]'
+        target.data_path = f'{poses.normalized_weight_property_path}[{pose_index}]'
 
         influence = driver.variables.new()
         influence.type = 'SINGLE_PROP'

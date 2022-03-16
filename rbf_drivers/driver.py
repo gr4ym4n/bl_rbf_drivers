@@ -4,6 +4,7 @@
 
 from typing import Any, Iterator, List, Optional, Tuple, Union
 import logging
+import numpy as np
 from bpy.types import PropertyGroup
 from bpy.props import (BoolProperty,
                        CollectionProperty,
@@ -11,25 +12,29 @@ from bpy.props import (BoolProperty,
                        FloatProperty,
                        IntProperty,
                        PointerProperty)
+from rbf_drivers.posedata import RBFDriverPoseDataMatrix
 
 from .lib.curve_mapping import BCLMAP_CurveManager
 from .lib.symmetry import symmetrical_target
 
 from .mixins import Symmetrical
 
-from .input import (RBFDriverInputs, input_influence_sum_driver_update, input_influence_sum_idprop_ensure,
+from .input import (RBFDriverInputs,
+                    input_influence_sum_driver_update,
+                    input_influence_sum_idprop_ensure,
                     input_pose_distance_driver_update_all,
                     input_pose_distance_fcurve_update_all,
-                    input_pose_distance_idprop_update,
+                    input_pose_distance_idprop_update, input_pose_distance_matrix, input_pose_distance_matrix_update,
                     input_pose_radii_update)
 
 from .pose import (RBFDriverPose,
                    RBFDriverPoses,
                    pose_distance_sum_driver_update_all,
-                   pose_distance_sum_idprop_update,
-                   pose_weight_driver_update_all, pose_weight_fcurve_update,
+                   pose_distance_sum_idprop_update, pose_variable_idprop_update,
+                   pose_weight_driver_update_all,
+                   pose_weight_fcurve_update,
                    pose_weight_fcurve_update_all,
-                   pose_weight_idprop_update)
+                   pose_weight_idprop_update, pose_weight_normalized_driver_update_all, pose_weight_normalized_idprop_update, pose_weight_sum_driver_update, pose_weight_sum_idprop_update)
 
 from .output import RBFDriverOutputs
 
@@ -135,6 +140,12 @@ class RBFDriver(Symmetrical, PropertyGroup):
         options=set()
         )
 
+    pose_distance_matrix: PointerProperty(
+        name="Pose Distances",
+        type=RBFDriverPoseDataMatrix,
+        options=set()
+        )
+
     @property
     def reference_pose(self) -> Optional[RBFDriverPose]:
         return self.poses[0] if len(self.poses) else None
@@ -155,6 +166,41 @@ class RBFDriver(Symmetrical, PropertyGroup):
         if name:
             return self.id_data.rbf_drivers.get(name)
 
+    def pose_distance_matrix_update(self) -> None:
+        matrices = [
+            np.array(list(i.pose_distance_matrix.values()), dtype=float) for i in self.inputs
+            ]
+
+        count = len(matrices)
+
+        if count == 0:
+            matrix = None
+        elif count == 1:
+            matrix = matrices[0]
+        else:
+            matrix = np.add.reduce(matrices)
+            matrix /= float(len(matrices))
+
+        self.pose_distance_matrix.__init__(matrix)
+
+    def solution_update(self) -> None:
+        distance_matrix = self.pose_distance_matrix
+
+        if len(distance_matrix) == 0:
+            for pose in self.poses:
+                pose_variable_idprop_update(pose, [])
+        else:
+            distance_matrix = np.array(list(distance_matrix.values()), dtype=float)
+            identity_matrix = np.identity(distance_matrix.shape[0], dtype=float)
+
+            try:
+                solution = np.linalg.solve(distance_matrix, identity_matrix)
+            except np.linalg.LinAlgError:
+                solution = np.linalg.lstsq(distance_matrix, identity_matrix, rcond=None)[0]
+
+            for pose, data in zip(self.poses, solution.T):
+                pose_variable_idprop_update(pose, list(data))
+
     def update(self) -> None:
 
         inputs = self.inputs
@@ -162,10 +208,15 @@ class RBFDriver(Symmetrical, PropertyGroup):
         pose_count = len(self.poses)
 
         for input in inputs:
-            input_pose_radii_update(input)
+            matrix = input_pose_distance_matrix(input)
+            input_pose_distance_matrix_update(input, matrix)
+            input_pose_radii_update(input, matrix)
             input_pose_distance_idprop_update(input, pose_count)
             input_pose_distance_driver_update_all(input, pose_count)
             input_pose_distance_fcurve_update_all(input, pose_count)
+
+        # self.pose_distance_matrix_update()
+        # self.solution_update()
 
         input_influence_sum_idprop_ensure(inputs)
         input_influence_sum_driver_update(inputs)
@@ -179,9 +230,14 @@ class RBFDriver(Symmetrical, PropertyGroup):
 
         if not shape_keys:
             pose_weight_idprop_update(poses)
+            pose_weight_sum_idprop_update(poses)
+            pose_weight_normalized_idprop_update(poses)
 
         pose_weight_driver_update_all(poses, inputs, shape_keys)
         pose_weight_fcurve_update_all(poses, radius_basis, default_curve, shape_keys)
+
+        pose_weight_sum_driver_update(poses)
+        pose_weight_normalized_driver_update_all(poses)
 
         for output in self.outputs:
             output.update()

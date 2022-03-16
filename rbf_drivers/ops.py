@@ -39,7 +39,7 @@ from .pose import (RBFDriverPose, pose_distance_sum_driver_remove_all,
                    pose_weight_driver_remove_all,
                    pose_weight_driver_update_all,
                    pose_weight_idprop_remove,
-                   pose_weight_idprop_update)
+                   pose_weight_idprop_update, pose_weight_normalized_driver_remove, pose_weight_normalized_driver_remove_all, pose_weight_normalized_idprop_remove, pose_weight_normalized_idprop_update, pose_weight_sum_driver_remove, pose_weight_sum_driver_update, pose_weight_sum_idprop_remove, pose_weight_sum_idprop_update)
 
 log = logging.getLogger("rbf_drivers")
 
@@ -205,6 +205,10 @@ class RBFDRIVERS_OT_remove(bpy.types.Operator):
         poses = driver.poses
         shape_keys = driver.type == 'SHAPE_KEYS'
 
+        pose_weight_normalized_driver_remove_all(poses)
+        pose_weight_normalized_idprop_remove(poses)
+        pose_weight_sum_driver_remove(poses)
+        pose_weight_sum_idprop_remove(poses)
         pose_weight_driver_remove_all(poses, shape_keys)
         pose_weight_idprop_remove(poses)
         pose_distance_sum_driver_remove_all(poses)
@@ -852,6 +856,14 @@ class RBFDRIVERS_OT_pose_remove(bpy.types.Operator):
             input_pose_distance_driver_remove(input, count)
             input_pose_distance_driver_update_all(input, count)
             input_pose_distance_fcurve_update_all(input, count)
+
+        # TODO shape keys and normalized weights
+
+        pose_weight_normalized_driver_remove(poses, count)
+        pose_weight_normalized_idprop_update(poses)
+
+        pose_weight_sum_driver_update(poses)
+        pose_weight_sum_idprop_update(poses)
 
         pose_weight_driver_remove(poses, count, is_shape_keys)
         pose_weight_idprop_update(poses)

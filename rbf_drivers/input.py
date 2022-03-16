@@ -34,7 +34,7 @@ from bpy.props import (BoolProperty,
 
 import numpy as np
 from rna_prop_ui import rna_idprop_ui_create
-from .posedata import RBFDriverPoseDataVector, ActivePoseData
+from .posedata import RBFDriverPoseDataVector, RBFDriverPoseDataMatrix, ActivePoseData
 from .mixins import LAYER_TYPE_ITEMS, ID_TYPE_ITEMS, ID_TYPE_INDEX, Identifiable, Symmetrical
 from .lib import rotation_utils
 from .lib.symmetry import symmetrical_target
@@ -1193,6 +1193,12 @@ class RBFDriverInput(Symmetrical, PropertyGroup):
     def pose_count(self) -> int:
         return len(self.rbf_driver.poses)
 
+    pose_distance_matrix: PointerProperty(
+        name="Distances",
+        type=RBFDriverPoseDataMatrix,
+        options=set()
+        )
+
     @property
     def pose_distance_property_name(self) -> str:
         return f'rbfi_dist_{self.identifier}'
@@ -1688,13 +1694,30 @@ def input_pose_distance_matrix(input: RBFDriverInput) -> np.ndarray:
     return matrix
 
 
-def input_pose_radii_update(input: RBFDriverInput) -> None:
+def input_pose_distance_matrix_update(input: RBFDriverInput, data: Optional[np.ndarray]=None) -> None:
     """
     """
     if DEBUG:
         assert isinstance(input, RBFDriverInput)
+        assert data is None or isinstance(data, np.ndarray)
 
-    matrix = input_pose_distance_matrix(input).view(np.ma.MaskedArray)
+    if data is None:
+        data = input_pose_distance_matrix(input)
+
+    input.pose_distance_matrix.__init__(data)
+
+
+def input_pose_radii_update(input: RBFDriverInput, matrix: Optional[np.ndarray]=None) -> None:
+    """
+    """
+    if DEBUG:
+        assert isinstance(input, RBFDriverInput)
+        assert matrix is None or isinstance(matrix, np.ndarray)
+
+    if matrix is None:
+        matrix = input_pose_distance_matrix(input)
+
+    matrix = matrix.view(np.ma.MaskedArray)
     matrix.mask = np.identity(len(matrix), dtype=np.bool)
 
     data = []

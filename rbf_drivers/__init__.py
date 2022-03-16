@@ -45,6 +45,7 @@ def classes():
         curve_mapping.BLCMAP_OT_curve_edit,
         posedata.RBFDriverPoseDataScalar,
         posedata.RBFDriverPoseDataVector,
+        posedata.RBFDriverPoseDataMatrix,
         posedata.RBFDriverActivePoseDataValue,
         input.RBFDriverInputTarget,
         input.RBFDriverInputTargets,

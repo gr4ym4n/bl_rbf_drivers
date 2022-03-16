@@ -1,5 +1,5 @@
 
-from typing import Generic, Iterable, Iterator, List, Optional, TypeVar, Union
+from typing import Generic, Iterable, Iterator, List, Optional, Sequence, Tuple, TypeVar, Union
 from functools import partial
 from bpy.types import PropertyGroup
 from bpy.props import CollectionProperty, EnumProperty, FloatProperty
@@ -82,6 +82,31 @@ class RBFDriverPoseDataVector(PropertyGroup):
     def values(self) -> Iterator[float]:
         for scalar in self:
             yield scalar.value
+
+
+class RBFDriverPoseDataMatrix(PropertyGroup):
+
+    data__internal__: CollectionProperty(
+        type=RBFDriverPoseDataVector,
+        options={'HIDDEN'}
+        )
+
+    def __len__(self) -> int:
+        return len(self.data__internal__)
+
+    def __iter__(self) -> Iterator[RBFDriverPoseDataVector]:
+        return iter(self.data__internal__)
+
+    def __init__(self, data: Optional[Sequence[Sequence[float]]]=None) -> None:
+        rows = self.data__internal__
+        rows.clear()
+        if data is not None:
+            for seq in data:
+                rows.add().__init__(seq)
+
+    def values(self) -> Iterator[Tuple[float]]:
+        for vector in self:
+            yield tuple(vector.values())
 
 
 def input_pose_value_get(data: 'RBFDriverActivePoseDataValue') -> float:

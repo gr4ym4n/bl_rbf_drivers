@@ -593,8 +593,6 @@ class RBFDRIVERS_PT_inputs(bpy.types.Panel):
                     col.prop(tgt, "transform_space", text="")
 
 
-
-
 class RBFDRIVERS_UL_outputs(bpy.types.UIList):
     bl_idname = 'RBFDRIVERS_UL_outputs'
 
@@ -1165,7 +1163,6 @@ class RBFDRIVERS_PT_pose_interpolation(bpy.types.Panel):
         row = col.row()
         row.prop(driver.falloff, "radius", text="Radius")
         row.label(icon='BLANK1')
-
 
 
 def draw_active_pose_data(layout: bpy.types.UILayout, data: ActivePoseData):

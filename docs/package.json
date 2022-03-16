@@ -1,0 +1,22 @@
+{
+  "name": "rbf_drivers",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "dev": "nuxt",
+    "build": "nuxt build",
+    "start": "nuxt start",
+    "generate": "nuxt generate"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@nuxt/content": "^1.15.1",
+    "@nuxt/content-theme-docs": "^0.11.1",
+    "nuxt": "^2.15.8",
+    "puppeteer": "^13.5.1",
+    "remark-mermaid": "^0.2.0",
+    "remark-mermaidjs": "^2.1.1"
+  }
+}
