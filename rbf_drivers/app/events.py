@@ -1,14 +1,14 @@
 
-from typing import Callable, Dict, List, Optional, Tuple, Type, TypeVar
+from typing import Callable, Dict, List, Optional, Tuple, Type
 from dataclasses import dataclass
 
 @dataclass(frozen=True)
 class Event:pass
 
-_handlers: Dict[Type[Event], List[Callable[[Event], None]]]
+_handlers: Dict[Type[Event], List[Callable[[Event], None]]] = {}
 
 def dispatch_event(event: Event) -> None:
-    handlers = _handlers.get(type(Event))
+    handlers = _handlers.get(event.__class__)
     if handlers:
         for handler in handlers:
             handler(event)

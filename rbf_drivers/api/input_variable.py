@@ -1,5 +1,5 @@
 
-from typing import Any, Dict, Iterator, TYPE_CHECKING
+from typing import TYPE_CHECKING
 from logging import getLogger
 from bpy.types import Context, PropertyGroup
 from bpy.props import (BoolProperty,
@@ -7,20 +7,19 @@ from bpy.props import (BoolProperty,
                        FloatProperty,
                        PointerProperty,
                        StringProperty)
-from rbf_drivers.lib.symmetry import symmetrical_target
 from .mixins import Symmetrical
-from .input_target import RBFDriverInputTarget
 from .input_targets import RBFDriverInputTargets
 from .input_variable_data import RBFDriverInputVariableData
+from ..app.events import dataclass, dispatch_event, Event
+from ..app.utils import owner_resolve
 from ..lib.transform_utils import (transform_matrix,
                                    transform_matrix_element,
                                    transform_target,
                                    transform_target_distance,
                                    transform_target_rotational_difference)
 if TYPE_CHECKING:
+    from .input_target import RBFDriverInputTarget
     from .input import RBFDriverInput
-    from .pose import RBFDriverPose
-    from .pose_weight import RBFDriverPoseWeight
 
 log = getLogger("rbf_drivers")
 
@@ -32,62 +31,77 @@ INPUT_VARIABLE_TYPE_ITEMS = [
     ('LOC_DIFF'     , "Distance"             , "Distance between two bones or objects."         , 'NONE', 3),
     ]
 
+INPUT_VARIABLE_TYPE_INDEX = {
+    item[0]: item[4] for item in INPUT_VARIABLE_TYPE_ITEMS
+    }
+
+
+@dataclass(frozen=True)
+class InputVariableIsEnabledUpdateEvent(Event):
+    variable: 'RBFDriverInputVariable'
+    value: bool
+
+
+@dataclass(frozen=True)
+class InputVariableIsInvertedUpdateEvent(Event):
+    variable: 'RBFDriverInputVariable'
+    value: bool
+
+
+@dataclass(frozen=True)
+class InputVariableNameUpdateEvent(Event):
+    variable: 'RBFDriverInputVariable'
+    value: str
+
+
+@dataclass(frozen=True)
+class InputVariableDefaultValueUpdateEvent(Event):
+    variable: 'RBFDriverInputVariable'
+    value: float
+
+
+@dataclass(frozen=True)
+class InputVariableTypeUpdateEvent(Event):
+    variable: 'RBFDriverInputVariable'
+    value: str
+
 
 def input_variable_type_get(variable: 'RBFDriverInputVariable') -> int:
     return variable.get("type", 0)
 
 
 def input_variable_type_set(variable: 'RBFDriverInputVariable', value: int) -> None:
-    input_ = variable.input
+    input: 'RBFDriverInput' = owner_resolve(variable, ".variables")
 
-    if input_.type != 'NONE':
-        raise RuntimeError((f'{variable.__class__.__name__}.type '
-                            f'is not user-editable for {input_.type} inputs.'))
+    if input.type != 'NONE':
+        raise RuntimeError((f'{variable}.type '
+                            f'is not user-editable for {input.type} inputs.'))
 
     variable["type"] = value
-    if variable.type.endswith('DIFF'):
-        if len(variable.targets) < 2:
-            variable.targets["length__internal__"] = 2
-            variable.targets.collection__internal__.add()
-    else:
-        variable.targets["length__internal__"] = 1
+    dispatch_event(InputVariableTypeUpdateEvent(variable, variable.type))
 
-    variable.property_mirror("type")
 
-def input_variable_default_value_update_handler(variable: 'RBFDriverInputVariable', context: Context) -> None:
-    input_variable_property_mirror(variable, "default_value", variable.default_value)
+def input_variable_default_value_update_handler(variable: 'RBFDriverInputVariable', _: Context) -> None:
+    dispatch_event(InputVariableDefaultValueUpdateEvent(variable, variable.default_value))
 
 
 def input_variable_is_enabled(variable: 'RBFDriverInputVariable') -> bool:
-    return variable.get("enabled", False)
+    return variable.get("is_enabled", False)
 
 
 def input_variable_is_enabled_set(variable: 'RBFDriverInputVariable', value: bool) -> None:
-    input = variable.input
+    input: 'RBFDriverInput' = owner_resolve(variable, ".variables")
     
     if input.type == 'ROTATION' and input.rotation_mode in {'QUATERNION', 'SWING', 'TWIST'}:
-        message = (f'{variable.__class__.__name__}.enabled '
-                   f'is not user-editable for {input.type} inputs.')
-        log.error(message)
-        raise AttributeError(message)
+        raise RuntimeError((f'{variable}.is_enabled is not writable for'
+                            f'{input} with type {input.type} and rotation_mode {input.rotation_mode}'))
 
-    variable["enabled"] = value
-
-    pose: 'RBFDriverPose'
-    for pose in input.rbf_driver.poses:
-        weight: 'RBFDriverPoseWeight' = pose.weight
-        weight.update()
-
-    if variable.has_symmetry_target:
-        input_variable_property_mirror(variable, "is_enabled", value)
+    variable["is_enabled"] = value
+    dispatch_event(InputVariableIsEnabledUpdateEvent(variable, value))
 
 
 def input_variable_is_inverted_update_handler(variable: 'RBFDriverInputVariable', _: Context) -> None:
-
-    # TODO
-
-    if variable.has_symmetry_target:
-        input_variable_property_mirror(variable, "is_inverted", variable.is_inverted)
+    dispatch_event(InputVariableIsInvertedUpdateEvent(variable, variable.is_inverted))
 
 
 def input_variable_name_get(variable: 'RBFDriverInputVariable') -> str:
@@ -95,29 +109,22 @@ def input_variable_name_get(variable: 'RBFDriverInputVariable') -> str:
 
 
 def input_variable_name_set(variable: 'RBFDriverInputVariable', value: str) -> None:
-    input = variable.input
+    input: 'RBFDriverInput' = owner_resolve(variable, ".variables")
 
     if input.type not in {'NONE', 'SHAPE_KEY'}:
-        message = f'{variable} name is not user-editable for input type {input.type}'
-        log.error(message)
-        raise AttributeError(message)
+        raise RuntimeError((f'{variable}.name is not writable '
+                            f'for {input} with type {input.type}'))
 
-    if input.type == 'SHAPE_KEY':
-        target: RBFDriverInputTarget = variable.targets[0]
-        target["data_path"] = f'key_blocks["{value}"].value'
-
-        pose: RBFDriverPose
-        for pose in input.rbf_driver.poses:
-            weight: RBFDriverPoseWeight = pose.weight
-            weight.update()
-
-    if variable.has_symmetry_target:
-        input_variable_property_mirror(variable, "name", symmetrical_target(value) or value)
+    dispatch_event(InputVariableNameUpdateEvent(variable, value))
 
 
 def input_variable_value__transforms(variable: 'RBFDriverInputVariable') -> float:
-    target = variable.targets[0]
+    target: 'RBFDriverInputTarget' = variable.targets[0]
     matrix = transform_matrix(transform_target(target.object, target.bone_target), target.transform_space)
+
+    if target.transform_type == 'ROT_W' and len(target.rotation_mode) < 5:
+        return 0.0
+
     return transform_matrix_element(matrix, target.transform_type, target.rotation_mode, driver=True)
 
 
@@ -151,45 +158,66 @@ def input_variable_value__single_prop(variable: 'RBFDriverInputVariable') -> flo
     return 0.0
 
 
-def input_variable_property_mirror(variable: 'RBFDriverInputVariable', name: str, value: Any) -> None:
+def input_variable_is_valid__singleprop(variable: 'RBFDriverInputVariable') -> bool:
+    target = variable.targets[0]
+    object = target.object
 
-    if not variable.has_symmetry_target:
-        return
-    
-    input = variable.input
-    if not input.has_symmetry_target:
-        log.warning(f'Symmetry target defined for component {variable} but not for {input}')
-        return
+    if object is None:
+        return False
 
-    driver = input.rbf_driver
-    if not driver.has_symmetry_target:
-        log.warning(f'Symmetry target defined for component {input} but not for {driver}')
-        return
+    idtype = target.id_type
 
-    if driver.symmetry_lock__internal__:
-        return
+    if idtype != 'OBJECT':
+        if object.type != idtype:
+            return False
+        id = object.data
+    else:
+        id = object
 
-    m_driver = driver.id_data.rbf_drivers.search(driver.symmetry_identifier)
-    if m_driver is None:
-        log.warning(f'Search failed for symmetry target of {driver}.')
-        return
-
-    m_input = driver.inputs.search(input.symmetry_identifier)
-    if m_input is None:
-        log.warning(f'Search failed for symmetry target of {input}.')
-        return
-
-    m_variable = m_input.variables.search(variable.symmetry_identifier)
-    if m_variable is None:
-        log.warning((f'Search failed for symmetry target of {variable}.'))
-        return
-
-    log.info(f'Mirroring {variable} property {name}')
-    m_driver.symmetry_lock__internal__ = True
     try:
-        setattr(m_variable, name, value)
-    finally:
-        m_driver.symmetry_lock__internal__ = False
+        value = id.path_resolve(target.data_path)
+    except ValueError:
+        return False
+    else:
+        return isinstance(value, (bool, int, float))
+
+
+def input_variable_is_valid__transforms(variable: 'RBFDriverInputVariable') -> bool:
+    target = variable.targets[0]
+    object = target.object
+
+    if object is None:
+        return False
+
+    if object.type == 'ARMATURE':
+        bone = target.bone_target
+        if bone:
+            return bone in object.data.bones
+
+    return True
+
+
+def input_variable_is_valid__diff(variable: 'RBFDriverInputVariable') -> bool:
+    for target in variable.targets:
+        object = target.object
+
+        if object is None:
+            return False
+
+        if object.type == 'ARMATURE':
+            bone = target.bone_target
+            if bone and bone in object.data.bones:
+                return False
+
+    return True
+
+
+def input_variable_is_valid(variable: 'RBFDriverInputVariable') -> bool:
+    type = variable.type
+    if type == 'SINGLE_PROP' : return input_variable_is_valid__singleprop(variable)
+    if type == 'TRANSFORMS'  : return input_variable_is_valid__transforms(variable)
+    if type.endswith('DIIF') : return input_variable_is_valid__diff(variable)
+    return False
 
 
 class RBFDriverInputVariable(Symmetrical, PropertyGroup):
@@ -208,6 +236,14 @@ class RBFDriverInputVariable(Symmetrical, PropertyGroup):
         update=input_variable_default_value_update_handler
         )
 
+    is_enabled: BoolProperty(
+        name="Enabled",
+        description="Include or exclude the variable from the RBF driver calculations",
+        get=input_variable_is_enabled,
+        set=input_variable_is_enabled_set,
+        options=set(),
+        )
+
     is_inverted: BoolProperty(
         name="Invert",
         description="Invert the input variable's value when mirroring",
@@ -216,18 +252,9 @@ class RBFDriverInputVariable(Symmetrical, PropertyGroup):
         update=input_variable_is_inverted_update_handler
         )
 
-    is_enabled: BoolProperty(
-        name="Enabled",
-        description="Include of exclude the variable from the RBF driver calculations",
-        get=input_variable_is_enabled,
-        set=input_variable_is_enabled_set,
-        options=set(),
-        )
-
     @property
-    def input(self) -> 'RBFDriverInput':
-        path: str = self.path_from_id()
-        return self.id_data.path_resolve(path.rpartition(".variables.")[0])
+    def is_valid(self) -> bool:
+        return input_variable_is_valid(self)
 
     name: StringProperty(
         name="Name",
@@ -262,13 +289,3 @@ class RBFDriverInputVariable(Symmetrical, PropertyGroup):
         if type == 'LOC_DIFF'      : return input_variable_value__loc_diff(self)
         if type == 'ROTATION_DIFF' : return input_variable_value__rotation_diff(self)
         return input_variable_value__single_prop(self)
-
-    def __init__(self, **props: Dict[str, Any]) -> None:
-        self.targets.__init__(props.pop("targets", [{}]))
-
-        for name, value in props.items():
-            self[name] = value
-        
-        input = self.input
-        normalize = input.type != 'ROTATION' or input.rotation_mode != 'QUATERNION'
-        self.data.__init__([self.default], normalize)

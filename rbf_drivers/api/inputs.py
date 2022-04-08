@@ -1,45 +1,83 @@
 
-from typing import Any, Iterator, List, Optional, Union
-from bpy.types import PropertyGroup
-from bpy.props import CollectionProperty, IntProperty
-from .input import RBFDriverInput
+from bpy.types import PropertyGroup, UILayout
+from bpy.props import CollectionProperty
+from .mixins import LayerCollection
+from .input import INPUT_TYPE_INDEX, RBFDriverInput
+from ..app.events import dataclass, dispatch_event, Event
 
-class RBFDriverInputs(PropertyGroup):
 
-    active_index: IntProperty(
-        name="Shape Key",
-        min=0,
-        default=0,
-        options=set()
-        )
+@dataclass(frozen=True)
+class InputNewEvent(Event):
+    input: RBFDriverInput
 
-    @property
-    def active(self) -> Optional[RBFDriverInput]:
-        index = self.active_index
-        return self[index] if index < len(self) else None
+
+@dataclass(frozen=True)
+class InputDisposableEvent(Event):
+    input: RBFDriverInput
+
+
+@dataclass(frozen=True)
+class InputRemovedEvent(Event):
+    inputs: 'RBFDriverInputs'
+    index: int
+
+
+@dataclass(frozen=True)
+class InputMoveEvent(Event):
+    input: RBFDriverInput
+    from_index: int
+    to_index: int
+
+
+class RBFDriverInputs(LayerCollection[RBFDriverInput], PropertyGroup):
 
     collection__internal__: CollectionProperty(
         type=RBFDriverInput,
         options={'HIDDEN'}
         )
 
-    def __len__(self) -> int:
-        return len(self.collection__internal__)
+    def index(self, input: RBFDriverInput) -> int:
+        if not isinstance(input, RBFDriverInput):
+            raise TypeError((f'{self.__class__.__name__}.index(input): '
+                             f'Expected input to be RBFDriverInput, not {input.__class__.__name__}'))
+        return super().index(input)
 
-    def __iter__(self) -> Iterator[RBFDriverInput]:
-        return iter(self.collection__internal__)
+    def move(self, from_index: int, to_index: int) -> None:
+        if super().move(from_index, to_index):
+            dispatch_event(InputMoveEvent(self[to_index], from_index, to_index))
 
-    def __getitem__(self, key: Union[int, slice]) -> Union[RBFDriverInput, List[RBFDriverInput]]:
-        return self.collection__internal__[key]
+    def new(self, type: str) -> RBFDriverInput:
 
-    def __contains__(self, value: Any) -> bool:
-        return any([item == value for item in self])
+        if not isinstance(type, str):
+            raise TypeError((f'{self.__class__.__name__}.new(type): '
+                             f'Expected type to be str, not {type.__class__.__name__}'))
 
-    def find(self, name: str) -> int:
-        return next((index for index, input_ in enumerate(self) if input_.name == name), -1)
+        if type not in INPUT_TYPE_INDEX:
+            raise ValueError((f'{self.__class__.__name__}.new(type): '
+                              f'type {type} not found in {", ".join(INPUT_TYPE_INDEX)}'))
 
-    def get(self, name: str, default: object) -> Any:
-        return next((item for item in self if item.name == name), default)
+        input: RBFDriverInput = self.collection__internal__.add()
+        input["type"] = INPUT_TYPE_INDEX[type]
+        input.name = UILayout.enum_item_name(input, "type", type)
 
-    def search(self, identifier: str) -> Optional[RBFDriverInput]:
-        return next((input_ for input_ in self if input_.identifier == identifier), None)
+        dispatch_event(InputNewEvent(input))
+
+        self.active_index = len(self) - 1
+        return input
+
+    def remove(self, input: RBFDriverInput) -> None:
+
+        if not isinstance(input, RBFDriverInput):
+            raise TypeError((f'{self.__class__.__name__}.remove(input): '
+                             f'Expected input to be {RBFDriverInput.__name__}, '
+                             f'not {input.__class__.__name__}'))
+
+        index = next((index for item, index in enumerate(self) if item == input), -1)
+
+        if index == -1:
+            raise ValueError((f'{self.__class__.__name__}.remove(input): '
+                             f'Input {input} not found in collection {self}'))
+
+        dispatch_event(InputDisposableEvent(input))
+        self.collection__internal__.remove(index)
+        dispatch_event(InputRemovedEvent(input, index))

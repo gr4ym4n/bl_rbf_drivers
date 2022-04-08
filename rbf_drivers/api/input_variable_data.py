@@ -1,15 +1,21 @@
 
-from typing import Iterator, List, Optional, Sequence, Union, TYPE_CHECKING
+from typing import Iterator, List, Optional, Sequence, Union
 from bpy.types import PropertyGroup
-from bpy.props import BoolProperty, FloatProperty, PointerProperty
+from bpy.props import BoolProperty, CollectionProperty, FloatProperty
 import numpy as np
-from .input_variable_data_sample import RBFDriverInputVariableDataSample
-if TYPE_CHECKING:
-    from .input_variable import RBFDriverInputVariable
+from rbf_drivers.app.utils import owner_resolve
+from .input_variable_data_sample import RBFDriverInputVariableDataSample, InputVariableDataSampleUpdateEvent
+from ..app.events import dataclass, dispatch_event, event_handler, Event
+
+
+@dataclass(frozen=True)
+class InputVariableDataUpdateEvent(Event):
+    data: 'RBFDriverInputVariableData'
+
 
 class RBFDriverInputVariableData(PropertyGroup):
 
-    data__internal__: PointerProperty(
+    data__internal__: CollectionProperty(
         type=RBFDriverInputVariableDataSample,
         options={'HIDDEN'}
         )
@@ -26,11 +32,6 @@ class RBFDriverInputVariableData(PropertyGroup):
         options=set()
         )
 
-    @property
-    def variable(self) -> 'RBFDriverInputVariable':
-        path: str = self.path_from_id()
-        return self.id_data.path_resolve(path.rpartition(".")[0])
-
     def __getitem__(self, key: Union[int, slice]) -> Union[RBFDriverInputVariableDataSample, List[RBFDriverInputVariableDataSample]]:
         return self.data__internal__[key]
 
@@ -40,22 +41,16 @@ class RBFDriverInputVariableData(PropertyGroup):
     def __len__(self) -> int:
         return len(self.data__internal__)
 
-    def __init__(self, data: Sequence[float], normalize: Optional[bool]=False) -> None:
-        samples = self.data__internal__
-        samples.clear()
+    def __init__(self, values: Sequence[float], normalize: Optional[bool]=None) -> None:
+        self["is_normalized"] = self.is_normalized if normalize is None else normalize
 
-        for index, value in enumerate(data):
-            samples.add().__init__(index, value)
+        data = self.data__internal__
+        data.clear()
 
-        if normalize:
-            self["is_normalized"] = True
-            norm = self["norm"] = np.linalg.norm(data)
-            if norm != 0.0:
-                for sample in self.data__internal__:
-                    sample["value_normalized"] = sample.value / norm
-        else:
-            self["is_normalized"] = False
-            self.property_unset("norm")
+        for index, value in enumerate(values):
+            data.add().__init__(index, value)
+
+        self.update(propagate=False)
 
     def value(self, index: int, normalized: Optional[bool]=False) -> float:
         return self[index].value_normalized if normalized else self[index].value
@@ -68,10 +63,11 @@ class RBFDriverInputVariableData(PropertyGroup):
             for item in self:
                 yield item.value
 
-    def update(self) -> None:
+    def update(self, propagate: Optional[bool]=True) -> None:
+
         if self.is_normalized:
             norm = np.linalg.norm(list(self.values(normalized=False)))
-            self["norm"] = norm
+
             if norm == 0.0:
                 for sample in self.data__internal__:
                     sample.property_unset("value_normalized")
@@ -79,6 +75,14 @@ class RBFDriverInputVariableData(PropertyGroup):
                 for sample in self.data__internal__:
                     sample["value_normalized"] = sample.value / norm
 
-        pdist = self.variable.input.pose_distance
-        pdist.matrix.update()
-        pdist.drivers.update()
+        if propagate:
+            dispatch_event(InputVariableDataUpdateEvent(self))
+
+
+@event_handler(InputVariableDataSampleUpdateEvent)
+def on_input_variable_data_sample_update(event: InputVariableDataSampleUpdateEvent) -> None:
+    '''
+    '''
+    data: RBFDriverInputVariableData = owner_resolve(event.sample, ".data.")
+    if data.is_normalized:
+        data.update()

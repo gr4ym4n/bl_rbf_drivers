@@ -5,11 +5,31 @@ from typing import Callable, Sequence, TYPE_CHECKING
 from logging import getLogger
 from bpy.types import PropertyGroup
 from bpy.props import EnumProperty, PointerProperty
+from ..rbf_drivers.api.mixins import ArrayContainer
 from .input_distance_matrix import RBFDriverInputDistanceMatrix
+from ..rbf_drivers.app.utils import owner_resolve
 if TYPE_CHECKING:
-    from .input import RBFDriverInput
+    from ..rbf_drivers.api.input import RBFDriverInput
 
 log = getLogger("rbf_drivers")
+
+
+INPUT_DISTANCE_METRIC_ITEMS = [
+    ('EUCLIDEAN' , "Euclidean" , "Euclidean distance" ),
+    ('ANGLE'     , "Angle"     , "Angle difference"   ),
+    ('QUATERNION', "Quaternion", "Quaternion distance"),
+    ('DIRECTION' , "Direction" , "Aim vector distance"),
+    ]
+
+
+def input_distance_metric(distance: 'RBFDriverInputDistance') -> int:
+    input: 'RBFDriverInput' = owner_resolve(distance, ".")
+    if input.type == 'ROTATION':
+        mode = input.rotation_mode
+        if mode == 'QUATERNION'     : return 2
+        if mode.startswith('SWING') : return 3
+        if mode.startswith('TWIST') : return 1
+    return 0
 
 
 class RBFDriverInputDistance(PropertyGroup):
@@ -48,13 +68,6 @@ class RBFDriverInputDistance(PropertyGroup):
 
             return (asin((sum(ai * bi for ai, bi in zip(a, b)))) - -(pi / 2.0)) / pi
 
-    METRIC_ENUM_ITEMS = [
-        ('EUCLIDEAN'),
-        ('ANGLE'),
-        ('QUATERNION'),
-        ('DIRECTION'),
-        ]
-
     @property
     def function(self) -> Function:
         metric = self.metric
@@ -63,30 +76,21 @@ class RBFDriverInputDistance(PropertyGroup):
         if metric == 'ANGLE'      : return partial(self.functions.angle, axis=self.input.rotation_mode[-1])
         return self.functions.euclidean
 
-    @property
-    def input(self) -> 'RBFDriverInput':
-        path: str = self.path_from_id()
-        return self.id_data.path_resolve(path.rpartition(".")[0])
-
     matrix: PointerProperty(
         name="Matrix",
         type=RBFDriverInputDistanceMatrix,
         options=set()
         )
 
-    @property
-    def metric_enum_item_index(self) -> int:
-        input = self.input
-        if input.type == 'ROTATION':
-            mode = input.rotation_mode
-            if mode == 'QUATERNION'     : return 2
-            if mode.startswith('SWING') : return 3
-            if mode.startswith('TWIST') : return 1
-        return 0
-
     metric: EnumProperty(
         name="Metric",
-        items=METRIC_ENUM_ITEMS,
-        get=metric_enum_item_index.getter,
+        items=INPUT_DISTANCE_METRIC_ITEMS,
+        get=input_distance_metric,
+        options=set()
+        )
+
+    pose_radii: PointerProperty(
+        name="Radii",
+        type=ArrayContainer,
         options=set()
         )

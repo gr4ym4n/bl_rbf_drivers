@@ -1,5 +1,5 @@
 
-from typing import Any, Dict, Iterator, List, Optional, Sequence, Union
+from typing import Any, Iterator, List, Optional, Union
 from bpy.types import PropertyGroup
 from bpy.props import CollectionProperty, IntProperty
 from .input_target import RBFDriverInputTarget
@@ -28,13 +28,6 @@ class RBFDriverInputTargets(PropertyGroup):
 
     def __getitem__(self, key: Union[int, slice]) -> Union[RBFDriverInputTarget, List[RBFDriverInputTarget]]:
         return self.collection__internal__[key]
-
-    def __init__(self, targets: Sequence[Dict[str, Any]]) -> None:
-        collection = self.collection__internal__
-        collection.clear()
-        self["length__internal__"] = len(targets)
-        for props in targets:
-            collection.add().__init__(**props)
 
     def search(self, identifier: str) -> Optional[RBFDriverInputTarget]:
         return next((target for target in self.collection__internal__ if target.identifier == identifier), None)

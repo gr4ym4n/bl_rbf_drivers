@@ -1,55 +1,86 @@
 
-from typing import Any, Callable, Dict, Iterator, List, Optional, TYPE_CHECKING, Sequence, Union
+from typing import Any, Optional, TYPE_CHECKING
 from logging import getLogger
-from bpy.types import Context, ID, Object, PropertyGroup
-from bpy.props import CollectionProperty, EnumProperty, IntProperty, StringProperty, PointerProperty
-from .mixins import Symmetrical
-from ..app.events import Event, dispatch_event
+from bpy.types import ID, Object, PropertyGroup
+from bpy.props import EnumProperty, StringProperty, PointerProperty
+from .mixins import Symmetrical, Targetable
+from ..app.events import dataclass, dispatch_event, Event
 from ..app.utils import owner_resolve
-from ..lib.transform_utils import ROTATION_MODE_INDEX, ROTATION_MODE_ITEMS, TRANSFORM_SPACE_INDEX, TRANSFORM_TYPE_ITEMS, TRANSFORM_SPACE_ITEMS
-from ..lib.symmetry import symmetrical_target
-
+from ..lib.transform_utils import ROTATION_MODE_ITEMS, TRANSFORM_TYPE_ITEMS, TRANSFORM_SPACE_ITEMS
 if TYPE_CHECKING:
-    from .input_variable import RBFDriverInputVariable
+    from bpy.types import Context
     from .input import RBFDriverInput
 
 log = getLogger("rbf_drivers")
 
+INPUT_TARGET_ID_TYPE_ITEMS = [
+    ('OBJECT'     , "Object"  , "", 'OBJECT_DATA',                0),
+    ('MESH'       , "Mesh"    , "", 'MESH_DATA',                  1),
+    ('CURVE'      , "Curve"   , "", 'CURVE_DATA',                 2),
+    ('SURFACE'    , "Surface" , "", 'SURFACE_DATA',               3),
+    ('META'       , "Metaball", "", 'META_DATA',                  4),
+    ('FONT'       , "Font"    , "", 'FONT_DATA',                  5),
+    ('HAIR'       , "Hair"    , "", 'HAIR_DATA',                  6),
+    ('POINTCLOUD' , "Point"   , "", 'POINTCLOUD_DATA',            7),
+    ('VOLUME'     , "Volume"  , "", 'VOLUME_DATA',                8),
+    ('GPENCIL'    , "GPencil" , "", 'OUTLINER_DATA_GREASEPENCIL', 9),
+    ('ARMATURE'   , "Armature", "", 'ARMATURE_DATA',              10),
+    ('LATTICE'    , "Lattice" , "", 'LATTICE_DATA',               11),
+    ('EMPTY'      , "Empty"   , "", 'EMPTY_DATA',                 12),
+    ('LIGHT'      , "Light"   , "", 'LIGHT_DATA',                 13),
+    ('LIGHT_PROBE', "Light"   , "", 'OUTLINER_DATA_LIGHTPROBE',   14),
+    ('CAMERA'     , "Camera"  , "", 'CAMERA_DATA',                15),
+    ('SPEAKER'    , "Speaker" , "", 'OUTLINER_DATA_SPEAKER',      16),
+    ('KEY'        , "Key"     , "", 'SHAPEKEY_DATA',              17),
+]
 
+INPUT_TARGET_ID_TYPE_INDEX = {
+    item[0]: item[4] for item in INPUT_TARGET_ID_TYPE_ITEMS
+    }
+
+
+@dataclass(frozen=True)
 class InputTargetPropertyUpdateEvent(Event):
     target: 'RBFDriverInputTarget'
     value: Any
 
 
+@dataclass(frozen=True)
 class InputTargetBoneTargetUpdateEvent(InputTargetPropertyUpdateEvent):
     value: str
 
 
+@dataclass(frozen=True)
 class InputTargetDataPathUpdateEvent(InputTargetPropertyUpdateEvent):
     value: str
 
 
+@dataclass(frozen=True)
 class InputTargetIDTypeUpdateEvent(InputTargetPropertyUpdateEvent):
     value: str
 
 
+@dataclass(frozen=True)
 class InputTargetObjectUpdateEvent(InputTargetPropertyUpdateEvent):
     value: Optional[Object]
 
 
+@dataclass(frozen=True)
 class InputTargetRotationModeUpdateEvent(InputTargetPropertyUpdateEvent):
     value: str
 
 
+@dataclass(frozen=True)
 class InputTargetTransformSpaceUpdateEvent(InputTargetPropertyUpdateEvent):
     value: str
 
 
+@dataclass(frozen=True)
 class InputTargetTransformTypeUpdateEvent(InputTargetPropertyUpdateEvent):
     value: str
 
 
-def input_target_bone_target_did_update(target: 'RBFDriverInputTarget', _: Context) -> None:
+def input_target_bone_target_did_update(target: 'RBFDriverInputTarget', _: 'Context') -> None:
     dispatch_event(InputTargetBoneTargetUpdateEvent(target, target.bone_target))
 
 
@@ -79,15 +110,15 @@ def input_target_id_type_set(target: 'RBFDriverInputTarget', value: int) -> None
     dispatch_event(InputTargetIDTypeUpdateEvent(target, target.id_type))
 
 
-def input_target_object_did_update(target: 'RBFDriverInputTarget', _: Context) -> None:
+def input_target_object_did_update(target: 'RBFDriverInputTarget', _: 'Context') -> None:
     dispatch_event(InputTargetObjectUpdateEvent(target, target.object))
 
 
-def input_target_rotation_mode_did_update(target: 'RBFDriverInputTarget', _: Context) -> None:
+def input_target_rotation_mode_did_update(target: 'RBFDriverInputTarget', _: 'Context') -> None:
     dispatch_event(InputTargetObjectUpdateEvent(target, target.object))
 
 
-def input_target_transform_space_did_update(target: 'RBFDriverInputTarget', _: Context) -> None:
+def input_target_transform_space_did_update(target: 'RBFDriverInputTarget', _: 'Context') -> None:
     dispatch_event(InputTargetTransformSpaceUpdateEvent(target, target.transform_space))
 
 
@@ -104,28 +135,7 @@ def input_target_transform_type_set(target: 'RBFDriverInputTarget', value: int) 
     dispatch_event(InputTargetTransformTypeUpdateEvent(target, target.transform_type))
 
 
-class RBFDriverInputTarget(Symmetrical, PropertyGroup):
-
-    ID_TYPES = [
-        ('OBJECT'     , "Object"  , "", 'OBJECT_DATA',                0),
-        ('MESH'       , "Mesh"    , "", 'MESH_DATA',                  1),
-        ('CURVE'      , "Curve"   , "", 'CURVE_DATA',                 2),
-        ('SURFACE'    , "Surface" , "", 'SURFACE_DATA',               3),
-        ('META'       , "Metaball", "", 'META_DATA',                  4),
-        ('FONT'       , "Font"    , "", 'FONT_DATA',                  5),
-        ('HAIR'       , "Hair"    , "", 'HAIR_DATA',                  6),
-        ('POINTCLOUD' , "Point"   , "", 'POINTCLOUD_DATA',            7),
-        ('VOLUME'     , "Volume"  , "", 'VOLUME_DATA',                8),
-        ('GPENCIL'    , "GPencil" , "", 'OUTLINER_DATA_GREASEPENCIL', 9),
-        ('ARMATURE'   , "Armature", "", 'ARMATURE_DATA',              10),
-        ('LATTICE'    , "Lattice" , "", 'LATTICE_DATA',               11),
-        ('EMPTY'      , "Empty"   , "", 'EMPTY_DATA',                 12),
-        ('LIGHT'      , "Light"   , "", 'LIGHT_DATA',                 13),
-        ('LIGHT_PROBE', "Light"   , "", 'OUTLINER_DATA_LIGHTPROBE',   14),
-        ('CAMERA'     , "Camera"  , "", 'CAMERA_DATA',                15),
-        ('SPEAKER'    , "Speaker" , "", 'OUTLINER_DATA_SPEAKER',      16),
-        ('KEY'        , "Key"     , "", 'SHAPEKEY_DATA',              17),
-    ]
+class RBFDriverInputTarget(Targetable, Symmetrical, PropertyGroup):
 
     bone_target: StringProperty(
         name="Bone",
@@ -145,7 +155,7 @@ class RBFDriverInputTarget(Symmetrical, PropertyGroup):
     id_type: EnumProperty(
         name="Type",
         description="The type of ID to target",
-        items=ID_TYPES,
+        items=INPUT_TARGET_ID_TYPE_ITEMS,
         get=input_target_id_type,
         set=input_target_id_type_set,
         options=set(),
@@ -193,7 +203,3 @@ class RBFDriverInputTarget(Symmetrical, PropertyGroup):
         set=input_target_transform_type_set,
         options=set(),
         )
-
-    def __init__(self, **props: Dict[str, Any]) -> None:
-        for name, value in props.items():
-            self[name] = value

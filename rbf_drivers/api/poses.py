@@ -2,30 +2,47 @@
 from typing import Any, Iterator, List, Optional, Tuple, Union, TYPE_CHECKING
 from logging import getLogger
 from bpy.types import PropertyGroup
-from bpy.props import CollectionProperty, IntProperty, PointerProperty
-from .pose_weight_property import RBFDriverPoseWeightProperty
-from .pose_weight_driver import RBFDriverPoseWeightDriver
-from .pose_weight import RBFDriverPoseWeight
-from .pose_weight_normalized_property import RBFDriverPoseWeightNormalizedProperty
-from .pose_weight_normalized_driver import RBFDriverPoseWeightNormalizedDriver
-from .pose_weight_normalized import RBFDriverPoseWeightNormalized
+from bpy.props import BoolProperty, CollectionProperty, IntProperty
 from .pose import RBFDriverPose
-from .poses_weight_sum_driver import RBFDriverPosesWeightSumDriver
-from .poses_weight_sum_property import RBFDriverPosesWeightSumProperty
-from .poses_weight_sum import RBFDriverPosesWeightSum
+from ..app.events import dataclass, dispatch_event, Event
 if TYPE_CHECKING:
-    from .input_variable_data_sample import RBFDriverInputVariableDataSample
-    from .input_variable_data import RBFDriverInputVariableData
-    from .input_variable import RBFDriverInputVariable
-    from .input_distance_property import RBFDriverInputDistanceProperty
-    from .input_distance_driver import RBFDriverInputDistanceDriver
-    from .input_distance_matrix import RBFDriverInputDistanceMatrix
-    from .input import RBFDriverInput
-    from .driver_distance_matrix import RBFDriverDistanceMatrix
-    from .driver_variable_matrix import RBFDriverVariableMatrix
-    from .driver import RBFDriver
+    from bpy.types import Context
 
 log = getLogger("rbf_drivers")
+
+
+@dataclass(frozen=True)
+class PoseNewEvent(Event):
+    pose: 'RBFDriverPose'
+
+
+@dataclass(frozen=True)
+class PoseDisposableEvent(Event):
+    pose: RBFDriverPose
+
+
+@dataclass(frozen=True)
+class PoseRemovedEvent(Event):
+    poses: 'RBFDriverPoses'
+    index: int
+
+
+@dataclass(frozen=True)
+class PoseMoveEvent(Event):
+    pose: RBFDriverPose
+    from_index: int
+    to_index: int
+
+
+@dataclass(frozen=True)
+class PoseActiveIndexUpdateEvent(Event):
+    poses: 'RBFDriverPoses'
+    value: int
+
+
+def poses_active_index_update_handler(poses: 'RBFDriverPoses', _: 'Context') -> None:
+    dispatch_event(PoseActiveIndexUpdateEvent(poses, poses.active_index))
+
 
 class RBFDriverPoses(PropertyGroup):
 
@@ -33,7 +50,8 @@ class RBFDriverPoses(PropertyGroup):
         name="Shape Key",
         min=0,
         default=0,
-        options=set()
+        options=set(),
+        update=poses_active_index_update_handler
         )
 
     @property
@@ -46,14 +64,24 @@ class RBFDriverPoses(PropertyGroup):
         options={'HIDDEN'}
         )
 
-    @property
-    def rbf_driver(self) -> 'RBFDriver':
-        path: str = self.path_from_id()
-        return self.id_data.path_resolve(path.rpartition(".")[0])
+    display_influence: BoolProperty(
+        name="Influence",
+        description="Show/Hide influence in list",
+        default=True,
+        options=set()
+        )
 
-    weight_sum: PointerProperty(
-        name="Weights",
-        type=RBFDriverPosesWeightSum,
+    display_radius: BoolProperty(
+        name="Radius",
+        description="Show/Hide radius in list",
+        default=True,
+        options=set()
+        )
+
+    display_weight: BoolProperty(
+        name="Weight",
+        description="Show/Hide weight in list",
+        default=True,
         options=set()
         )
 
@@ -69,69 +97,51 @@ class RBFDriverPoses(PropertyGroup):
     def find(self, name: str) -> int:
         return self.collection__internal__.find(name)
 
+    def get(self, name: str, default: Any) -> Any:
+        return self.collection__internal__.get(name, default)
+
     def keys(self) -> Iterator[str]:
         return iter(self.collection__internal__.keys())
 
-    def get(self, name: str, default: Any) -> Any:
-        return self.collection__internal__.get(name, default)
+    def index(self, pose: RBFDriverPose) -> int:
+        if not isinstance(pose, RBFDriverPose):
+            raise TypeError((f'{self.__class__.__name__}.index(pose): '
+                             f'Expected pose to be RBFDriverPose, not {pose.__class__.__name__}'))
+
+        return next(index for index, item in enumerate(self) if item == pose)
 
     def items(self) -> Iterator[Tuple[str, RBFDriverPose]]:
         for item in self:
             yield item.name, item
 
-    def new(self, name: Optional[str]="") -> RBFDriverPose:
-        rbf_driver = self.rbf_driver
+    def move(self, from_index: int, to_index: int) -> None:
 
+        if not isinstance(from_index, int):
+            raise TypeError((f'{self.__class__.__name__}.move(from_index, to_index): '
+                             f'Expected from_index to be int, not {from_index.__class__.__name__}'))
+
+        if not isinstance(to_index, int):
+            raise TypeError((f'{self.__class__.__name__}.move(from_index, to_index): '
+                             f'Expected to_index to be int, not {to_index.__class__.__name__}'))
+
+        if 0 > from_index >= len(self):
+            raise IndexError((f'{self.__class__.__name__}.move(from_index, to_index): '
+                              f'from_index {from_index} out of range 0-{len(self)-1}'))
+
+        if 0 > to_index >= len(self):
+            raise IndexError((f'{self.__class__.__name__}.move(from_index, to_index): '
+                              f'to_index {to_index} out of range 0-{len(self)-1}'))
+
+        if from_index != to_index:
+            self.collection__internal__.move(from_index, to_index)
+            dispatch_event(PoseMoveEvent(self[to_index], from_index, to_index))
+
+    def new(self, name: Optional[str]="") -> RBFDriverPose:
         log.info("Adding new pose")
         pose: RBFDriverPose = self.collection__internal__.add()
         pose.name = name or "Pose"
-
-        input: RBFDriverInput
-        for input in rbf_driver.inputs:
-
-            variable: RBFDriverInputVariable
-            for variable in input.variables:
-                data: RBFDriverInputVariableData = variable.data
-                item: RBFDriverInputVariableDataSample = input.variables.data.data__internal__.add()
-                item.__init__(len(data)-1, variable.value)
-
-            matrix: RBFDriverInputDistanceMatrix = input.distance.matrix
-            matrix.update(propagate=False)
-
-            idprop: RBFDriverInputDistanceProperty = input.distance.id_property
-            idprop.update()
-            driver: RBFDriverInputDistanceDriver = input.distance.drivers.collection__internal__.add()
-            driver.update()
-
-        matrix: RBFDriverInputDistanceMatrix = rbf_driver.distance.matrix
-        matrix.update(propagate=False)
-
-        matrix: RBFDriverDistanceMatrix = rbf_driver.distance_matrix
-        matrix.update(propagate=False)
-
-        matrix: RBFDriverVariableMatrix = rbf_driver.variable_matrix
-        matrix.update(propagate=False)
-
-        weight: RBFDriverPoseWeight = pose.weight
-        idprop: RBFDriverPoseWeightProperty = weight.id_property
-        driver: RBFDriverPoseWeightDriver = weight.driver
-        idprop.update()
-        driver.update()
-
-        weight: RBFDriverPosesWeightSum = self.weight_sum
-        idprop: RBFDriverPosesWeightSumProperty = weight.id_property
-        driver: RBFDriverPosesWeightSumDriver = weight.driver
-        idprop.update()
-        driver.update()
-
-        weight: RBFDriverPoseWeightNormalized = self.weight.normalized
-        idprop: RBFDriverPoseWeightNormalizedProperty = weight.id_property
-        driver: RBFDriverPoseWeightNormalizedDriver = weight.driver
-        idprop.update()
-        driver.update()
-
-        # TODO mirror pose
-
+        dispatch_event(PoseNewEvent(pose))
+        self.active_index = len(self) - 1
         return pose
 
     def remove(self, pose: RBFDriverPose) -> None:
@@ -150,9 +160,12 @@ class RBFDriverPoses(PropertyGroup):
             raise RuntimeError((f'{self.__class__.__name__}.remove(pose): '
                                 f'pose is rest pose and cannot be removed'))
 
-        # TODO lots of stuff
-
+        dispatch_event(PoseDisposableEvent(pose))
+        
         self.collection__internal__.remove(index)
+        self.active_index = min(self.active_index, len(self) - 1)
+
+        dispatch_event(PoseRemovedEvent(self, index))
 
     def search(self, identifier: str) -> Optional[RBFDriverPose]:
         return next((item for item in self if item.identifier == identifier), None)

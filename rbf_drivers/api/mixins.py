@@ -1,9 +1,12 @@
 
-from typing import Any, Iterable, Iterator, List, Sequence, Tuple, Union
+from ctypes import Union
+from typing import TYPE_CHECKING, Any, Generic, Iterable, Iterator, List, Optional, Sequence, Tuple, TypeVar
 from uuid import uuid4
-from bpy.types import ID, PropertyGroup
-from bpy.props import CollectionProperty, FloatProperty, IntProperty, IntVectorProperty, StringProperty
-import numpy as np
+from bpy.types import PropertyGroup
+from bpy.props import BoolProperty, EnumProperty, StringProperty
+if TYPE_CHECKING:
+    from bpy.types import ID, Object
+
 
 def identifier(pgroup: 'Identifiable') -> str:
     value = PropertyGroup.get(pgroup, "identifier")
@@ -11,6 +14,7 @@ def identifier(pgroup: 'Identifiable') -> str:
         value = uuid4().hex
         PropertyGroup.__setitem__(pgroup, "identifier", value)
     return value
+
 
 class Identifiable:
 
@@ -20,6 +24,7 @@ class Identifiable:
         get=identifier,
         options={'HIDDEN'}
         )
+
 
 class Symmetrical(Identifiable):
 
@@ -34,204 +39,128 @@ class Symmetrical(Identifiable):
         return bool(self.symmetry_identifier)
 
 
-def id_property_target_name(target: 'IDPropertyTarget') -> str:
-    return target.get("name", "")
-
-
-class IDPropertyTarget:
-
-    name: StringProperty(
-        name="Name",
-        description="Name of the id-property",
-        get=id_property_target_name,
-        options=set()
-        )
+class Targetable:
 
     @property
-    def data_path(self) -> str:
-        return f'["{self.name}"]'
+    def bone_target(self) -> str:
+        raise NotImplementedError(f'{self.__class__.__name__}.bone_target')
+
+    @property
+    def id(self) -> Optional['ID']:
+        raise NotImplementedError(f'{self.__class__.__name__}.id')
 
     @property
     def id_type(self) -> str:
-        return self.id_data.type
+        raise NotImplementedError(f'{self.__class__.__name__}.id_type')
 
     @property
-    def id(self) -> ID:
-        return self.id_data.data
+    def object(self) -> Optional['Object']:
+        raise NotImplementedError(f'{self.__class__.__name__}.object')
 
-    @property
-    def value(self) -> Any:
-        return self.id.get(self.name, None)
+class Layer(Symmetrical):
 
-
-class FloatContainer(PropertyGroup):
-
-    index: IntProperty(
-        name="Index",
-        description="Index of the item within its data structure",
-        get=lambda self: self.get("index", 0),
+    ui_label: EnumProperty(
+        items=[
+            ('PATH', "Path", "", 'RNA' , 0),
+            ('NAME', "Name", "", 'CON_FOLLOWTRACK', 1),
+            ],
+        default='PATH',
         options=set()
         )
 
-    value: FloatProperty(
-        name="Value",
-        get=lambda self: self.get("value", 0.0),
+    ui_open: BoolProperty(
+        name="Open",
+        description="Show/Hide input settings in the UI",
+        default=True,
         options=set()
         )
 
-    def __init__(self, index: int, value: float) -> None:
-        self["index"] = index
-        self["value"] = value
+    ui_show_pose: BoolProperty(
+        name="Show",
+        description="Show/Hide pose values in the UI",
+        default=False,
+        options=set()
+        )
 
+ItemType = TypeVar('ItemType', bound='PropertyGroup')
 
-class MatrixVectorAccess:
+class ItemCollection(Generic[ItemType]):
 
-    def __init__(self, data: 'Matrix', axis: int, index: int) -> None:
-        self._data = data
-        self._axis = axis
-        self._index = index
+    @property
+    def collection__internal__(self) -> Sequence[ItemType]:
+        raise NotImplementedError(f'{self.__class__.__name__}.collection__internal__')
 
     def __len__(self) -> int:
-        return self._data.shape[int(not self._axis)]
+        return len(self.collection__internal__)
 
-    def __iter__(self) -> Iterator[float]:
-        data = self._data.data__internal__
-        for index in self.indices:
-            yield data[index].value
+    def __iter__(self) -> Iterator[ItemType]:
+        return iter(self.collection__internal__)
 
-    def __getitem__(self, key: Union[int, slice]) -> Union[float, List[float]]:
-        data = self._data.data__internal__
-        idxs = tuple(self.indices)
-        if isinstance(key, int):
-            return data[idxs[key]].value
-        if isinstance(key, slice):
-            return [data[index].value for index in idxs[key]]
+    def __getitem__(self, key: Union[int, str, slice]) -> Union[ItemType, List[ItemType]]:
+        if not isinstance(key, (int, str, slice)):
+            raise TypeError((f'{self.__class__.__name__}[key]: '
+                             f'Expected key to be int, str or slice, not {key.__class__.__name__}'))
+        return self.collection__internal__[key]
 
-    @property
-    def indices(self) -> Iterable[int]:
-        shape = self._data.shape
-        index = self._index
-        if self._axis == 0:
-            alpha = shape[1] * index
-            delta = 1
-            omega = alpha + shape[1]
+    def __contains__(self, key: Union[str, Any]) -> bool:
+        if isinstance(key, str):
+            return self.find(key) != -1
         else:
-            alpha = index
-            delta = shape[1]
-            omega = shape[0] * delta
-        return range(alpha, omega, delta)
+            return any(x == key for x in self)
 
-    def item(self, index: int) -> FloatContainer:
-        return self._data.data__internal__[tuple(self.indices)[index]]
+    def find(self, name: str) -> int:
+        if not isinstance(name, str):
+            raise TypeError((f'{self.__class__.__name__}.find(name) '
+                             f'Expected name to be str, not {name.__class__.__name__}'))
+        return next((i for i, x in enumerate(self) if x.name == name), -1)
 
-    def items(self) -> Iterator[FloatContainer]:
-        data = self._data.data__internal__
-        idxs = self.indices
-        for index in idxs:
-            yield data[index]
+    def get(self, name: str, default: object) -> Any:
+        if not isinstance(name, str):
+            raise TypeError((f'{self.__class__.__name__}.get(name, default) '
+                             f'Expected name to be str, not {name.__class__.__name__}'))
+        return next((x for x in self if x.name == name), default)
 
-    def to_array(self) -> np.ndarray:
-        return np.array(tuple(self), dtype=float)
+    def index(self, item: ItemType) -> int:
+        index = next((i for i, x in enumerate(self) if x == item), -1)
+        if index == -1:
+            raise ValueError((f'{self.__class__.__name__}.index(item): '
+                              f'item is not a member of this collection'))
+        return index
 
+    def keys(self) -> Iterable[str]:
+        return self.collection__internal__.keys()
 
-class MatrixAccess:
+    def items(self) -> Iterable[Tuple[str, ItemType]]:
+        return self.collection__internal__.items()
 
-    def __init__(self, data: 'Matrix', axis: int) -> None:
-        self._data = data
-        self._axis = axis
+    def values(self) -> Iterable[ItemType]:
+        return self.collection__internal__.values()
 
-    def __len__(self) -> int:
-        return self._data.shape[self._axis]
+LayerType = TypeVar('LayerType', bound=Layer)
 
-    def __iter__(self) -> Iterator[MatrixVectorAccess]:
-        data = self._data
-        axis = self._axis
-        for index in range(len(self)):
-            yield MatrixVectorAccess(data, axis, index)
+class LayerCollection(ItemCollection[LayerType]):
 
-    def __getitem__(self, key: Union[int, slice]) -> Union[MatrixVectorAccess, List[MatrixVectorAccess]]:
-        if isinstance(key, int):
-            if key >= len(self):
-                raise IndexError()
-            return MatrixVectorAccess(self._data, self._axis, key)
-        if isinstance(key, slice):
-            data = self._data
-            axis = self._axis
-            return [MatrixVectorAccess(data, axis, index) for index in range(len(self))]
-        raise TypeError()
+    def move(self, from_index: int, to_index: int) -> None:
 
-class Matrix:
+        if not isinstance(from_index, int):
+            raise TypeError((f'{self.__class__.__name__}.move(from_index, to_index): '
+                             f'Expected from_index to be int, not {from_index.__class__.__name__}'))
 
-    data__internal__: CollectionProperty(
-        type=FloatContainer,
-        options={'HIDDEN'}
-        )
+        if not isinstance(to_index, int):
+            raise TypeError((f'{self.__class__.__name__}.move(from_index, to_index): '
+                             f'Expected to_index to be int, not {to_index.__class__.__name__}'))
 
-    shape: IntVectorProperty(
-        name="Shape",
-        get=lambda self: self.get("shape", (0, 0)),
-        options=set()
-        )
+        if 0 > from_index >= len(self):
+            raise IndexError((f'{self.__class__.__name__}.move(from_index, to_index): '
+                              f'from_index {from_index} out of range 0-{len(self)-1}'))
 
-    @property
-    def rows(self) -> MatrixAccess:
-        return MatrixAccess(self, 0)
+        if 0 > to_index >= len(self):
+            raise IndexError((f'{self.__class__.__name__}.move(from_index, to_index): '
+                              f'to_index {to_index} out of range 0-{len(self)-1}'))
 
-    @property
-    def columns(self) -> MatrixAccess:
-        return MatrixAccess(self, 1)
+        if from_index != to_index:
+            self.collection__internal__.move(from_index, to_index)
+            return True
 
-    @property
-    def size(self) -> int:
-        shape = self.shape
-        return shape[0] * shape[1]
-
-    def __len__(self) -> int:
-        return self.shape[0]
-
-    def __iter__(self) -> Iterator[MatrixAccess]:
-        return iter(MatrixAccess(self, 0))
-
-    def __getitem__(self, key: Union[int, slice]) -> Union[MatrixVectorAccess, List[MatrixVectorAccess]]:
-        return self.rows[key]
-
-    def __init__(self, data: Sequence[Sequence[float]]) -> None:
-        scalars = self.data__internal__
-        scalars.clear()
-        if len(data) == 0:
-            self["shape"] = (0, 0)
-        else:
-            data = np.asarray(data, dtype=float)
-            self["shape"] = data.shape
-            for index, value in enumerate(data.flat):
-                scalars.add().__init__(index, value)
-
-    def item(self, key: Union[int, Tuple[int, int]]) -> FloatContainer:
-
-        if isinstance(key, int):
-            return self.data__internal__[key]
-
-        if isinstance(key, tuple):
-
-            if len(key) != 2:
-                raise ValueError((f'{self.__class__.__name__}.item(key): '
-                                  f'Expected tuple key to be have length 2, not {len(key)}'))
-
-            if not all([isinstance(item, int) for item in key]):
-                raise ValueError((f'{self.__class__.__name__}.item(key): '
-                                  f'Expected tuple key to be contains int values'))
-
-            return self.data__internal__[key[0] * self.shape[1] + key[1]]
-        
-        raise TypeError((f'{self.__class__.__name__}.item(key): '
-                         f'Expected key to be int or tuple, not {key.__class__.__name__}'))
-
-    def items(self) -> Iterator[FloatContainer]:
-        return iter(self.data__internal__)
-
-    def to_array(self) -> np.ndarray:
-        shape = self.shape
-        array = np.empty(shape[0] * shape[1], dtype=float)
-        self.data__internal__.foreach_get("value", array)
-        array.shape = tuple(shape)
-        return array
+    def search(self, identifier: str) -> Optional[LayerType]:
+        return next((item for item in self if item.identifier == identifier), None)

@@ -1,8 +1,23 @@
 
-from typing import Any, Iterator, List, Optional, Union
+from typing import Any, Iterator, List, Optional, Union, TYPE_CHECKING
 from bpy.types import PropertyGroup
 from bpy.props import CollectionProperty, IntProperty
 from .input_variable import RBFDriverInputVariable
+from ..app.events import dataclass, dispatch_event, Event
+from ..app.utils import owner_resolve
+if TYPE_CHECKING:
+    from .input import RBFDriverInput
+
+
+@dataclass(frozen=True)
+class InputVariableNewEvent(Event):
+    variable: RBFDriverInputVariable
+
+
+@dataclass(frozen=True)
+class InputVariableDisposableEvent(Event):
+    variable: RBFDriverInputVariable
+
 
 class RBFDriverInputVariables(PropertyGroup):
 
@@ -55,6 +70,41 @@ class RBFDriverInputVariables(PropertyGroup):
 
     def get(self, name: str, default: Optional[object]=None) -> Any:
         return self.collection__internal__.get(name, default)
+
+    def index(self, variable: RBFDriverInputVariable) -> int:
+        return next(index for index, item in enumerate(self) if variable == item)
+
+    def new(self) -> RBFDriverInputVariable:
+        input: 'RBFDriverInput' = owner_resolve(self, ".")
+
+        if input.type != 'NONE':
+            raise RuntimeError((f'{self.__class__.__name__}.new(): '
+                                f'Variables are not mutable for inputs of type {input.type}'))
+
+        variable: RBFDriverInputVariable = self.collection__internal__.add()
+        dispatch_event(InputVariableNewEvent(variable))
+        return variable
+
+    def remove(self, variable: RBFDriverInputVariable) -> None:
+        input: 'RBFDriverInput' = owner_resolve(self, ".")
+
+        if input.type != 'NONE':
+            raise RuntimeError((f'{self.__class__.__name__}.remove(variable): '
+                                f'Variables are not mutable for inputs of type {input.type}'))
+
+        if not isinstance(variable, RBFDriverInputVariable):
+            raise TypeError((f'{self.__class__.__name__}.remove(variable): '
+                             f'Expected variable to be {RBFDriverInputVariable.__class__.__name__}, '
+                             f'not {variable.__class__.__name__}'))
+
+        index = next((index for index, item in enumerate(self) if item == variable), -1)
+
+        if index == -1:
+            raise ValueError((f'{self.__class__.__name__}.remove(variable): '
+                              f'{variable} is not a member of this collection'))
+
+        dispatch_event(InputVariableDisposableEvent(variable))
+        self.collection__internal__.remove(index)
 
     def search(self, identifier: str) -> Optional[RBFDriverInputVariable]:
         return next((variable for variable in self if variable.identifier == identifier), None)

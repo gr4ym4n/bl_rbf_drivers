@@ -2,12 +2,16 @@
 from typing import TYPE_CHECKING, Optional
 from bpy.types import PropertyGroup
 from bpy.props import FloatProperty, IntProperty
-from ..app.events import dispatch_event, Event
+from ..app.events import dataclass, dispatch_event, Event
+from ..app.utils import owner_resolve
+if TYPE_CHECKING:
+    from .input_variable import RBFDriverInputVariable
 
 
+@dataclass(frozen=True)
 class InputVariableDataSampleUpdateEvent(Event):
-    variable: 'RBFDriverInputVariableDataSample'
-    value: float
+    sample: 'RBFDriverInputVariableDataSample'
+    value: Optional[float]
 
 
 def input_variable_data_sample_index(sample: 'RBFDriverInputVariableDataSample') -> int:
@@ -49,15 +53,17 @@ class RBFDriverInputVariableDataSample(PropertyGroup):
         self["index"] = index
         self["value"] = value
 
-    def update(self, propagate: Optional[bool]=True) -> None:
+    def update(self, value: Optional[float]=None, propagate: Optional[bool]=True) -> None:
         """
-        Updates the variable data sample value from the current variable value
+        Updates the variable data sample value
         """
-        variable = self.variable
-        self["value"] = variable.value
 
-        data = variable.data
-        if data.is_normalized:
-            data.update(propagate)
-        elif propagate:
-            dispatch_event(InputVariableDataSampleUpdateEvent(self, self.value))
+        if value is None:
+            value = owner_resolve(self, ".data.").value
+
+        elif not isinstance(value, float):
+            raise TypeError((f'{self.__class__.__name__}.update(value): '
+                             f'Expected value to be float, not {value.__class__.__name__}'))
+
+        if propagate:
+            dispatch_event(InputVariableDataSampleUpdateEvent(self, value))
