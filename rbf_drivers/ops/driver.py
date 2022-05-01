@@ -2,9 +2,6 @@
 from typing import List, Optional, Set, Tuple, Union, TYPE_CHECKING
 from bpy.types import Operator
 from bpy.props import EnumProperty
-from ..api.drivers import DriverNewEvent
-from ..app.events import dispatch_event
-from ..app.symmetry_manager import set_symmetry_target
 if TYPE_CHECKING:
     from bpy.types import Context
     from ..api.drivers import RBFDrivers
@@ -13,11 +10,11 @@ if TYPE_CHECKING:
 def new_type_items():
     items = []
     cache = [
-        ('NONE'          , "Generic"                 , "", 'DRIVER'       , 0),
-        ('NONE_SYM'      , "Generic (Symmetrical)"   , "", 'MOD_MIRROR'   , 1),
+        ('NONE'    , "Generic"              , "", 'DRIVER'    , 0),
+        ('NONE_SYM', "Generic (Symmetrical)", "", 'MOD_MIRROR', 1),
         None,
-        ('SHAPE_KEYS'    , "Shape Keys"              , "", 'SHAPEKEY_DATA', 2),
-        ('SHAPE_KEYS_SYM', "Shape Keys (Symmetrical)", "", 'MOD_MIRROR'   , 3),
+        ('SHAPE_KEY'    , "Shape Keys"              , "", 'SHAPEKEY_DATA', 2),
+        ('SHAPE_KEY_SYM', "Shape Keys (Symmetrical)", "", 'MOD_MIRROR'   , 3),
         ]
     def get_items(_: Operator, context: Optional['Context']) -> List[Union[Tuple[str, str, str, str, int], None]]:
         items.clear()

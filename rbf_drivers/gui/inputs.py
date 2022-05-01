@@ -1,90 +1,36 @@
 
-from typing import TYPE_CHECKING, Optional
-from bpy.types import Panel, UILayout, UIList
+from typing import TYPE_CHECKING
+from bpy.types import Panel, UIList
+from rbf_drivers.api.input import INPUT_TYPE_ICONS
 from .drivers import RBFDRIVERS_PT_drivers
-from .utils import GUIUtils, idprop_data_render, layout_split
-from ..ops.input import (RBFDRIVERS_OT_input_display_settings,
-                         RBFDRIVERS_OT_input_add,
+from .utils import GUILayerUtils
+from ..ops.input import (RBFDRIVERS_OT_input_add, RBFDRIVERS_OT_input_decompose,
                          RBFDRIVERS_OT_input_remove,
-                         RBFDRIVERS_OT_input_move)
+                         RBFDRIVERS_OT_input_move_up,
+                         RBFDRIVERS_OT_input_move_down,
+                         RBFDRIVERS_OT_input_variable_add,
+                         RBFDRIVERS_OT_input_variable_remove)
 if TYPE_CHECKING:
-    from bpy.types import Context, PropertyGroup
-    from ..api.input_target import RBFDriverInputTarget
+    from bpy.types import Context, UILayout
+    from ..api.input_variable import RBFDriverInputVariable
     from ..api.input import RBFDriverInput
-    from ..api.inputs import RBFDriverInputs
 
 
-class GUIInputUtils(GUIUtils):
+class RBFDRIVERS_UL_inputs(UIList):
+    bl_idname = 'RBFDRIVERS_UL_inputs'
 
-    @classmethod
-    def draw_path(cls, layout: 'UILayout', input: 'RBFDriverInput') -> None:
-        row = layout.row()
-        sub = row.row(align=True)
-        sub.alignment = 'LEFT'
-        sub.alert = not not input.is_valid
+    def draw_item(self, _0,
+                  layout: 'UILayout', _1,
+                  input: 'RBFDriverInput', _2, _3, _4) -> None:
 
-        target = input.variables[0].targets[0]
-        object = target.object
-
-        if object is None:
-            sub.label(icon='ERROR', text="Undefined")
-            sub.label(icon='RIGHTARROW_THIN')
-        else:
-            sub.label(text=object.name, icon_value=cls.enum_icon(target, "id_type"))
-            sub.label(icon='RIGHTARROW_THIN')
-            if object and object.type == 'ARMATURE':
-                name = target.bone_target
-                if name:
-                    icon = "ERROR" if name not in object.data.bones else "BONE_DATA"
-                    sub.label(icon=icon, text=name)
-                    sub.label(icon='RIGHTARROW_THIN')
-
-        type = input.type
-        if type == 'ROTATION':
-            mode = input.rotation_mode
-            text = f'{"Euler" if len(mode) < 5 else cls.enum_name(input, "rotation_mode")} Rotation'
-        elif type == 'NONE':
-            # TODO
-            text = ""
-        else:
-            text = cls.enum_name(input, "type")
-
-        sub.label(icon='RNA', text=text)
-        row.row()
+        layout.prop(input, "name",
+                    text="",
+                    icon=INPUT_TYPE_ICONS[input.type],
+                    emboss=False,
+                    translate=False)
 
 
-class RBFDRIVERS_PT_input_location_symmetry_settings(Panel):
-    bl_space_type = 'PROPERTIES'
-    bl_region_type = 'WINDOW'
-    bl_context = 'object'
-    bl_idname = 'RBFDRIVERS_PT_input_location_symmetry_settings'
-    bl_label = "Symmetry Settings"
-    bl_options = {'INSTANCED'}
-
-    @classmethod
-    def poll(cls, context: 'Context') -> bool:
-        object = context.object
-        return (object is not None
-                and object.is_property_set("rbf_drivers")
-                and object.rbf_drivers.active is not None
-                and object.rbf_drivers.active.inputs.active is not None
-                and object.rbf_drivers.active.inputs.active.type == 'LOCATION')
-
-    def draw(self, context: 'Context') -> None:
-        layout = self.layout
-        layout.use_property_split = True
-        layout.use_property_decorate = False
-
-        input = context.object.rbf_drivers.active.inputs.active
-        for axis, variable in zip('XYZ', input.variables):
-            row = layout.row(align=True)
-            row.alignment = 'RIGHT'
-            row.label(text=f'{"Invert " if axis == "X" else ""}{axis}')
-            row.prop(variable, "invert", text="")
-
-
-
-class RBFDRIVERS_PT_inputs(GUIInputUtils, Panel):
+class RBFDRIVERS_PT_inputs(GUILayerUtils, Panel):
 
     bl_space_type = 'PROPERTIES'
     bl_region_type = 'WINDOW'
@@ -101,137 +47,223 @@ class RBFDRIVERS_PT_inputs(GUIInputUtils, Panel):
                 and object.is_property_set("rbf_drivers")
                 and object.rbf_drivers.active is not None)
 
-    @classmethod
-    def draw_transform_target(cls, layout: 'UILayout', context: 'Context', target: 'RBFDriverInputTarget') -> None:
-        column = layout_split(layout, "Target", align=True)
-        column.prop_search(target, "object", context.blend_data, "objects", text="", icon='OBJECT_DATA')
-
-        object = target.object
-        if object is not None and object.type == 'ARMATURE':
-            row = column.row(align=True)
-            row.alert = bool(target.bone_target) and target.bone_target not in object.data.bones
-            column.prop_search(target, "bone_target", object.data, "bones", text="", icon='BONE_DATA')
-
-        column.separator()
-
     def draw(self, context: 'Context') -> None:
-        layout = self.subpanel()
+        layout = self.subpanel(self.layout)
+        inputs = context.object.rbf_drivers.active.inputs
 
         row = layout.row()
-        row.operator_menu_enum(RBFDRIVERS_OT_input_add.bl_idname, "type",
-                               text="Add Input",
-                               icon='ADD')
-        row.label(icon="BLANK1")
+        column = row.column()
+        column.template_list(RBFDRIVERS_UL_inputs.bl_idname, "",
+                             inputs, "collection__internal__",
+                             inputs, "active_index")
 
-        for input in context.object.rbf_drivers.active.inputs:
-            row = layout.row()
-            col = row.column(align=True)
-            self.draw_head(col.box(), input)
+        column = row.column(align=True)
+        column.operator_menu_enum(RBFDRIVERS_OT_input_add.bl_idname, "type", text="", icon='ADD')
+        column.operator(RBFDRIVERS_OT_input_remove.bl_idname, text="", icon='REMOVE')
+        column.separator()
+        column.operator(RBFDRIVERS_OT_input_move_up.bl_idname, text="", icon='TRIA_UP')
+        column.operator(RBFDRIVERS_OT_input_move_down.bl_idname, text="", icon='TRIA_DOWN')
+        column.separator()
+        column.operator(RBFDRIVERS_OT_input_decompose.bl_idname, text="", icon='RNA')
 
-            ops = row.column(align=True)
-            ops.scale_y = 0.85
+        input = inputs.active
 
-            op = RBFDRIVERS_OT_input_move.bl_idname
-            for dir in ('UP', 'DOWN'):
-                props = ops.operator(op, text="", icon=f'TRIA_{dir}')
-                props.direction = dir
-                props.input = input.name
+        if input is not None:
+            layout.separator()
+            getattr(self, f'draw_{input.type.lower()}')(layout, context, input)
 
-            if input.ui_open:
-                box = col.box()
-                box.separator()
-                getattr(self, f'draw_{input.type.lower()}')(box, context, input)
-                box.separator()
-
-    @classmethod
-    def draw_head(cls, layout: 'UILayout', input: 'RBFDriverInput') -> None:
-        row = layout.row()
-        row.scale_y = 1.25
-        row.prop(input, "ui_open",
-                 text="",
-                 icon=f'DISCLOSURE_TRI_{"DOWN" if input.ui_open else "RIGHT"}',
-                 emboss=False)
-
-        sub = row.row(align=True)
-
-        if input.ui_label == 'PATH':
-            subrow = sub.row(align=True)
-            subrow.scale_y = 0.6
-            cls.draw_path(subrow.box(), input)
-        else:
-            sub.prop(input, "name", text="")
-
-        subrow = sub.row(align=True)
-        subrow.scale_x = 1.1
-        subrow.prop(input, "ui_label", text="", icon_only=True)
-
-        row.operator(RBFDRIVERS_OT_input_remove.bl_idname,
-                     text="",
-                     icon='X',
-                     emboss=False).input=input.name
+            if input.type == 'USER_DEF':
+                layout.separator()
+                self.draw_variables(layout, context)
 
     def draw_location(self, layout: 'UILayout', context: 'Context', input: 'RBFDriverInput') -> None:
-        layout = self.layout
-        variables = input.variables
-        self.draw_transform_target(layout, context, variables[0].targets[0])
+        self.draw_transform_target(layout, context, input)
 
-        col, dec = layout_split(layout, "Location", decorate_fill=False)
-        row = col.row(align=True)
-        for axis, variable in zip("XYZ", variables):
-            row.prop(variable, "is_enabled", text=axis, toggle=True)
+        layout.separator(factor=0.5)
 
-        if input.has_symmetry_target:
-            dec.popover(panel=RBFDRIVERS_PT_input_location_symmetry_settings.bl_idname,
-                        icon='MOD_MIRROR',
-                        text="")
-        else:
-            dec.label(icon='BLANK1')
+        column = self.split_layout(layout, "Channels")
+        column.prop(input, "transform_space", text="")
 
-        col.prop(variables[0].targets[0], "transform_space", text="")
-        col.separator()
+        row = column.row(align=True)
+        for variable in input.variables:
+            row.prop(variable, "is_enabled", text=variable.name, toggle=True)
 
-    def draw_location(self, context: 'Context', input: 'RBFDriverInput') -> None:
-        layout = self.layout
-        variables = input.variables
-        self.draw_transform_target(layout, context, variables[0].targets[0])
+    def draw_rotation(self, layout: 'UILayout', context: 'Context', input: 'RBFDriverInput') -> None:
+        self.draw_transform_target(layout, context, input)
+        layout.separator(factor=0.5)
+        column = self.split_layout(layout, "Channels")
 
-        col, dec = layout_split(layout, "Location", decorate_fill=False)
-        row = col.row(align=True)
-        for axis, variable in zip("XYZ", variables):
-            row.prop(variable, "is_enabled", text=axis, toggle=True)
+        row = column.row()
+        row.prop(input, "rotation_mode", text="")
 
-        if input.has_symmetry_target:
-            dec.popover(panel=RBFDRIVERS_PT_input_location_symmetry_settings.bl_idname,
-                        icon='MOD_MIRROR',
-                        text="")
-        else:
-            dec.label(icon='BLANK1')
+        mode = input.rotation_mode
+        if mode == 'EULER':
+            subrow = row.row()
+            subrow.alignment = 'RIGHT'
+            subrow.prop(input, "rotation_order", text="")
+        elif mode in {'SWING', 'TWIST'}:
+            subrow = row.row()
+            subrow.alignment = 'RIGHT'
+            subrow.prop(input, "rotation_axis", text="")
 
-        col.prop(variables[0].targets[0], "transform_space", text="")
-        col.separator()
+        column.prop(input, "transform_space", text="")
 
-    @classmethod
-    def draw_rotation(cls, layout: 'UILayout', context: 'Context', input: 'RBFDriverInput') -> None:
-        cls.draw_transform_target(layout, context, input.variables[0].targets[0])
-
-        column, decorations = layout_split(layout, "Rotation", decorate_fill=False)
-        column.prop(input, "rotation_mode", text="")
-
-        if input.has_symmetry_target:
-            # TODO rotation symmetry settings
-            decorations.label(icon='BLANK1')
-            # dec.popover(panel=RBFDRIVERS_PT_input_location_symmetry_settings.bl_idname,
-            #             icon='MOD_MIRROR',
-            #             text="")
-        else:
-            decorations.label(icon='BLANK1')
-
-        column.prop(input.variables[0].targets[0], "transform_space", text="")
-
-        if len(input.rotation_mode) < 5:
-            row = column.row(align=True)
+        if mode == 'EULER':
+            subrow = column.row(align=True)
             for variable in input.variables[1:]:
-                row.prop(variable, "is_enabled", text=variable.name, toggle=True)
+                subrow.prop(variable, "is_enabled", text=variable.name, toggle=True)
 
-        column.separator()
-            
+    def draw_scale(self, layout: 'UILayout', context: 'Context', input: 'RBFDriverInput') -> None:
+        self.draw_transform_target(layout, context, input)
+
+        layout.separator(factor=0.5)
+
+        column = self.split_layout(layout, "Channels")
+        column.prop(input, "transform_space", text="")
+
+        row = column.row(align=True)
+        for variable in input.variables:
+            row.prop(variable, "is_enabled", text=variable.name, toggle=True)
+
+    def draw_rotation_diff(self, layout: 'UILayout', context: 'Context', input: 'RBFDriverInput') -> None:
+        for suffix, target in zip("AB", input.variables[0].targets):
+            self.draw_transform_target(layout, context, target, f'Target {suffix}')
+            if suffix == 'A':
+                layout.separator(factor=0.5)
+
+    def draw_loc_diff(self, layout: 'UILayout', context: 'Context', input: 'RBFDriverInput') -> None:
+        for suffix, target in zip("AB", input.variables[0].targets):
+            self.draw_transform_target(layout, context, target, f'Target {suffix}')
+            self.split_layout(layout, " ").prop(target, "transform_space", text="")
+            if suffix == 'A':
+                layout.separator(factor=0.5)
+
+    def draw_shape_key(self, layout: 'UILayout', context: 'Context', input: 'RBFDriverInput') -> None:
+        labels, values, decorations = self.split_layout(layout, decorate_fill=False)
+
+        labels.label(text="Object")
+        values.prop_search(input, "object", context.blend_data, "objects", text="", icon='OBJECT_DATA')
+        decorations.label(icon='BLANK1')
+
+        labels.separator()
+        values.separator()
+        decorations.separator()
+
+        labels.label(text="Shapes")
+        values.operator_context = 'INVOKE_DEFAULT'
+        values.operator(RBFDRIVERS_OT_input_variable_add.bl_idname, text="Add Shape Keys", icon='ADD')
+        decorations.label(icon='BLANK1')
+
+        try:
+            key = input.object.data.shape_keys
+        except:
+            key = None
+
+        for index, variable in enumerate(input.variables):
+            row = values.row(align=True)
+            subrow = row.row(align=True)
+            if key is None:
+                subrow.alert = True
+                subrow.prop(variable, "name", text="", icon='SHAPEKEY_DATA')
+            else:
+                subrow.alert = variable.name not in key.key_blocks
+                subrow.prop_search(variable, "name", key, "key_blocks", text="", icon='SHAPEKEY_DATA')
+            row.operator(RBFDRIVERS_OT_input_variable_remove.bl_idname, text="", icon='X').index = index
+            decorations.prop(variable, "is_enabled", text="")
+
+    def draw_user_def(self, layout: 'UILayout', context: 'Context', input: 'RBFDriverInput') -> None:
+        labels, values, decorations = self.split_layout(layout, decorate_fill=False)
+
+        labels.label(text="Type")
+        values.prop(input, "data_type", text="")
+
+        if input.data_type == 'QUATERNION' and len(input.variables) == 4:
+            row = values.row()
+            row.alignment = 'RIGHT'
+            row.label(text="Extract Swing Rotation:")
+
+            subrow = row.row()
+            subrow.alignment = 'RIGHT'
+            subrow.enabled = input.use_swing
+            subrow.prop(input, "rotation_axis", text="")
+
+            decorations.label(icon='BLANK1')
+            decorations.prop(input, "use_swing", text="")
+        else:
+            decorations.label(icon='BLANK1')
+
+    def draw_variables(self, layout: 'UILayout', context: 'Context') -> None:
+        column = self.split_layout(layout, "Variables")
+        column.operator(RBFDRIVERS_OT_input_variable_add.bl_idname, text="Add Input Variable", icon='ADD')
+
+        for index, variable in enumerate(context.object.rbf_drivers.active.inputs.active.variables):
+            column, decorations = self.split_layout(layout, " ", align=True, decorate_fill=False)
+
+            row = column.box().row()
+            row.prop(variable, "ui_expand",
+                 text="",
+                 icon=f'DISCLOSURE_TRI_{"DOWN" if variable.ui_expand else "RIGHT"}',
+                 emboss=False)
+
+            subrow = row.row(align=True)
+            subrow.prop(variable, "type", text="", icon_only=True)
+            subrow.prop(variable, "name", text="", translate=False)
+
+            subrow = row.row()
+            subrow.operator(RBFDRIVERS_OT_input_variable_remove.bl_idname,
+                            text="",
+                            icon='X',
+                            emboss=False).index=index
+
+            decorations.separator(factor=0.85)
+            decorations.prop(variable, "is_enabled", text="")
+
+            if variable.ui_expand:
+                row = column.box().row()
+                row.label(icon='BLANK1')
+
+                self.draw_variable_detail(row.column(), context, variable)
+
+                row = column.box().row()
+                row.label(icon='BLANK1')
+
+                val = self.split_layout(row, "Value:", alignment='LEFT')
+                val.label(text=f'{variable.value:.3f}')
+
+    def draw_variable_detail(self,
+                             layout: 'UILayout',
+                             context: 'Context',
+                             variable: 'RBFDriverInputVariable') -> None:
+
+        if variable.type == 'TRANSFORMS':
+            target = variable.targets[0]
+            self.draw_transform_target(layout, context, target, "Target:", alignment='LEFT')
+
+            layout.separator()
+
+            values = self.split_layout(layout, "Channel:", align=True, alignment='LEFT')
+
+            values.prop(target, "transform_type", text="")
+
+            if target.transform_type.startswith('ROT'):
+                values.prop(target, "rotation_mode", text="")
+
+            values.prop(target, "transform_space", text="")
+
+        elif variable.type == 'SINGLE_PROP':
+            target = variable.targets[0]
+            row = self.split_layout(layout, "Data:", alignment='LEFT').row(align=True)
+            row.prop(target, "id_type", text="", icon_only=True)
+
+            column = row.column(align=True)
+            column.prop_search(target, "object", context.blend_data, "objects", text="", icon='NONE')
+            column.prop(target, "data_path", text="", icon='RNA')
+
+        else:
+            for suffix, target in zip("AB", variable.targets):
+                self.draw_transform_target(layout, context, target, f'Target {suffix}:', alignment='LEFT')
+                if variable.type == 'LOC_DIFF':
+                    column = self.split_layout(layout, " ", alignment='LEFT')
+                    column.prop(target, "transform_space", text="")
+                if suffix == "A":
+                    layout.separator()

@@ -38,228 +38,51 @@ if TYPE_CHECKING:
     from ..api.input_variable_data import RBFDriverInputVariableData
     from ..api.input_variable import RBFDriverInputVariable
     from ..api.input import RBFDriverInput
-    from ..api.driver import RBFDriver
 
 ROTATION_CONVERSION_LUT = {
-        'AUTO': {
-            'AUTO'      : noop,
-            'XYZ'       : noop,
-            'XZY'       : noop,
-            'YXZ'       : noop,
-            'YZX'       : noop,
-            'ZXY'       : noop,
-            'ZYX'       : noop,
-            'SWING_X'   : euler_to_quaternion,
-            'SWING_Y'   : euler_to_quaternion,
-            'SWING_Z'   : euler_to_quaternion,
+        'EULER': {
+            'EULER'     : noop,
+            'SWING'     : euler_to_quaternion,
             'TWIST_X'   : partial(euler_to_swing_twist_x, quaternion=True),
             'TWIST_Y'   : partial(euler_to_swing_twist_y, quaternion=True),
             'TWIST_Z'   : partial(euler_to_swing_twist_z, quaternion=True),
             'QUATERNION': euler_to_quaternion,
             },
-        'XYZ': {
-            'AUTO'      : noop,
-            'XYZ'       : noop,
-            'XZY'       : noop,
-            'YXZ'       : noop,
-            'YZX'       : noop,
-            'ZXY'       : noop,
-            'ZYX'       : noop,
-            'SWING_X'   : euler_to_quaternion,
-            'SWING_Y'   : euler_to_quaternion,
-            'SWING_Z'   : euler_to_quaternion,
-            'TWIST_X'   : partial(euler_to_swing_twist_x, quaternion=True),
-            'TWIST_Y'   : partial(euler_to_swing_twist_y, quaternion=True),
-            'TWIST_Z'   : partial(euler_to_swing_twist_z, quaternion=True),
-            'QUATERNION': euler_to_quaternion,
-            },
-        'XZY': {
-            'AUTO'      : noop,
-            'XYZ'       : noop,
-            'XZY'       : noop,
-            'YXZ'       : noop,
-            'YZX'       : noop,
-            'ZXY'       : noop,
-            'ZYX'       : noop,
-            'SWING_X'   : euler_to_quaternion,
-            'SWING_Y'   : euler_to_quaternion,
-            'SWING_Z'   : euler_to_quaternion,
-            'TWIST_X'   : partial(euler_to_swing_twist_x, quaternion=True),
-            'TWIST_Y'   : partial(euler_to_swing_twist_y, quaternion=True),
-            'TWIST_Z'   : partial(euler_to_swing_twist_z, quaternion=True),
-            'QUATERNION': euler_to_quaternion,
-            },
-        'YXZ': {
-            'AUTO'      : noop,
-            'XYZ'       : noop,
-            'XZY'       : noop,
-            'YXZ'       : noop,
-            'YZX'       : noop,
-            'ZXY'       : noop,
-            'ZYX'       : noop,
-            'SWING_X'   : euler_to_quaternion,
-            'SWING_Y'   : euler_to_quaternion,
-            'SWING_Z'   : euler_to_quaternion,
-            'TWIST_X'   : partial(euler_to_swing_twist_x, quaternion=True),
-            'TWIST_Y'   : partial(euler_to_swing_twist_y, quaternion=True),
-            'TWIST_Z'   : partial(euler_to_swing_twist_z, quaternion=True),
-            'QUATERNION': euler_to_quaternion,
-            },
-        'YZX': {
-            'AUTO'      : noop,
-            'XYZ'       : noop,
-            'XZY'       : noop,
-            'YXZ'       : noop,
-            'YZX'       : noop,
-            'ZXY'       : noop,
-            'ZYX'       : noop,
-            'SWING_X'   : euler_to_quaternion,
-            'SWING_Y'   : euler_to_quaternion,
-            'SWING_Z'   : euler_to_quaternion,
-            'TWIST_X'   : partial(euler_to_swing_twist_x, quaternion=True),
-            'TWIST_Y'   : partial(euler_to_swing_twist_y, quaternion=True),
-            'TWIST_Z'   : partial(euler_to_swing_twist_z, quaternion=True),
-            'QUATERNION': euler_to_quaternion,
-            },
-        'ZXY': {
-            'AUTO'      : noop,
-            'XYZ'       : noop,
-            'XZY'       : noop,
-            'YXZ'       : noop,
-            'YZX'       : noop,
-            'ZXY'       : noop,
-            'ZYX'       : noop,
-            'SWING_X'   : euler_to_quaternion,
-            'SWING_Y'   : euler_to_quaternion,
-            'SWING_Z'   : euler_to_quaternion,
-            'TWIST_X'   : partial(euler_to_swing_twist_x, quaternion=True),
-            'TWIST_Y'   : partial(euler_to_swing_twist_y, quaternion=True),
-            'TWIST_Z'   : partial(euler_to_swing_twist_z, quaternion=True),
-            'QUATERNION': euler_to_quaternion,
-            },
-        'ZYX': {
-            'AUTO'      : noop,
-            'XYZ'       : noop,
-            'XZY'       : noop,
-            'YXZ'       : noop,
-            'YZX'       : noop,
-            'ZXY'       : noop,
-            'ZYX'       : noop,
-            'SWING_X'   : euler_to_quaternion,
-            'SWING_Y'   : euler_to_quaternion,
-            'SWING_Z'   : euler_to_quaternion,
-            'TWIST_X'   : partial(euler_to_swing_twist_x, quaternion=True),
-            'TWIST_Y'   : partial(euler_to_swing_twist_y, quaternion=True),
-            'TWIST_Z'   : partial(euler_to_swing_twist_z, quaternion=True),
-            'QUATERNION': euler_to_quaternion,
-            },
-        'SWING_X': {
-            'AUTO'      : quaternion_to_euler,
-            'XYZ'       : quaternion_to_euler,
-            'XZY'       : quaternion_to_euler,
-            'YXZ'       : quaternion_to_euler,
-            'YZX'       : quaternion_to_euler,
-            'ZXY'       : quaternion_to_euler,
-            'ZYX'       : quaternion_to_euler,
-            'SWING_X'   : noop,
-            'SWING_Y'   : noop,
-            'SWING_Z'   : noop,
-            'TWIST_X'   : partial(quaternion_to_swing_twist_x, quaternion=True),
-            'TWIST_Y'   : partial(quaternion_to_swing_twist_y, quaternion=True),
-            'TWIST_Z'   : partial(quaternion_to_swing_twist_z, quaternion=True),
-            'QUATERNION': noop,
-            },
-        'SWING_Y': {
-            'AUTO'      : quaternion_to_euler,
-            'XYZ'       : quaternion_to_euler,
-            'XZY'       : quaternion_to_euler,
-            'YXZ'       : quaternion_to_euler,
-            'YZX'       : quaternion_to_euler,
-            'ZXY'       : quaternion_to_euler,
-            'ZYX'       : quaternion_to_euler,
-            'SWING_X'   : noop,
-            'SWING_Y'   : noop,
-            'SWING_Z'   : noop,
-            'TWIST_X'   : partial(quaternion_to_swing_twist_x, quaternion=True),
-            'TWIST_Y'   : partial(quaternion_to_swing_twist_y, quaternion=True),
-            'TWIST_Z'   : partial(quaternion_to_swing_twist_z, quaternion=True),
-            'QUATERNION': noop,
-            },
-        'SWING_Z': {
-            'AUTO'      : quaternion_to_euler,
-            'XYZ'       : quaternion_to_euler,
-            'XZY'       : quaternion_to_euler,
-            'YXZ'       : quaternion_to_euler,
-            'YZX'       : quaternion_to_euler,
-            'ZXY'       : quaternion_to_euler,
-            'ZYX'       : quaternion_to_euler,
-            'SWING_X'   : noop,
-            'SWING_Y'   : noop,
-            'SWING_Z'   : noop,
+        'SWING': {
+            'EULER'     : quaternion_to_euler,
+            'SWING'     : noop,
             'TWIST_X'   : partial(quaternion_to_swing_twist_x, quaternion=True),
             'TWIST_Y'   : partial(quaternion_to_swing_twist_y, quaternion=True),
             'TWIST_Z'   : partial(quaternion_to_swing_twist_z, quaternion=True),
             'QUATERNION': noop,
             },
         'TWIST_X': {
-            'AUTO'      : swing_twist_x_to_euler,
-            'XYZ'       : swing_twist_x_to_euler,
-            'XZY'       : swing_twist_x_to_euler,
-            'YXZ'       : swing_twist_x_to_euler,
-            'YZX'       : swing_twist_x_to_euler,
-            'ZXY'       : swing_twist_x_to_euler,
-            'ZYX'       : swing_twist_x_to_euler,
-            'SWING_X'   : swing_twist_x_to_quaternion,
-            'SWING_Y'   : swing_twist_x_to_quaternion,
-            'SWING_Z'   : swing_twist_x_to_quaternion,
+            'EULER'     : swing_twist_x_to_euler,
+            'SWING'     : swing_twist_x_to_quaternion,
             'TWIST_X'   : noop,
             'TWIST_Y'   : swing_twist_x_to_swing_twist_y,
             'TWIST_Z'   : swing_twist_x_to_swing_twist_z,
             'QUATERNION': swing_twist_x_to_quaternion,
             },
         'TWIST_Y': {
-            'AUTO'      : swing_twist_y_to_euler,
-            'XYZ'       : swing_twist_y_to_euler,
-            'XZY'       : swing_twist_y_to_euler,
-            'YXZ'       : swing_twist_y_to_euler,
-            'YZX'       : swing_twist_y_to_euler,
-            'ZXY'       : swing_twist_y_to_euler,
-            'ZYX'       : swing_twist_y_to_euler,
-            'SWING_X'   : swing_twist_y_to_quaternion,
-            'SWING_Y'   : swing_twist_y_to_quaternion,
-            'SWING_Z'   : swing_twist_y_to_quaternion,
+            'EULER'     : swing_twist_y_to_euler,
+            'SWING'     : swing_twist_y_to_quaternion,
             'TWIST_X'   : swing_twist_y_to_swing_twist_x,
             'TWIST_Y'   : noop,
             'TWIST_Z'   : swing_twist_y_to_swing_twist_z,
             'QUATERNION': swing_twist_y_to_quaternion,
             },
         'TWIST_Z': {
-            'AUTO'      : swing_twist_z_to_euler,
-            'XYZ'       : swing_twist_z_to_euler,
-            'XZY'       : swing_twist_z_to_euler,
-            'YXZ'       : swing_twist_z_to_euler,
-            'YZX'       : swing_twist_z_to_euler,
-            'ZXY'       : swing_twist_z_to_euler,
-            'ZYX'       : swing_twist_z_to_euler,
-            'SWING_X'   : swing_twist_z_to_quaternion,
-            'SWING_Y'   : swing_twist_z_to_quaternion,
-            'SWING_Z'   : swing_twist_z_to_quaternion,
+            'EULER'     : swing_twist_z_to_euler,
+            'SWING'     : swing_twist_z_to_quaternion,
             'TWIST_X'   : swing_twist_z_to_swing_twist_x,
             'TWIST_Y'   : swing_twist_z_to_swing_twist_y,
             'TWIST_Z'   : noop,
             'QUATERNION': swing_twist_z_to_quaternion,
             },
         'QUATERNION': {
-            'AUTO'      : quaternion_to_euler,
-            'XYZ'       : quaternion_to_euler,
-            'XZY'       : quaternion_to_euler,
-            'YXZ'       : quaternion_to_euler,
-            'YZX'       : quaternion_to_euler,
-            'ZXY'       : quaternion_to_euler,
-            'ZYX'       : quaternion_to_euler,
-            'SWING_X'   : noop,
-            'SWING_Y'   : noop,
-            'SWING_Z'   : noop,
+            'EULER'     : quaternion_to_euler,
+            'SWING'     : noop,
             'TWIST_X'   : partial(quaternion_to_swing_twist_x, quaternion=True),
             'TWIST_Y'   : partial(quaternion_to_swing_twist_y, quaternion=True),
             'TWIST_Z'   : partial(quaternion_to_swing_twist_z, quaternion=True),
@@ -299,10 +122,11 @@ def on_input_rotation_mode_change(event: InputRotationModeChangeEvent) -> None:
         input = event.input
         variables = input.variables
 
-        if len(value) < 5:
+        if value == 'EULER':
             variables[0]["is_enabled"] = False
-        elif value.startswith('TWIST'):
-            axis = value[-1]
+        elif value == 'TWIST':
+            axis = event.input.rotation_axis
+            value = f'TWIST_{axis}'
             variables[0]["is_enabled"] = False
             variables[1]["is_enabled"] = axis == 'X'
             variables[2]["is_enabled"] = axis == 'Y'
@@ -311,6 +135,9 @@ def on_input_rotation_mode_change(event: InputRotationModeChangeEvent) -> None:
             for variable in variables:
                 variable["is_enabled"] = True
 
+        if cache == 'TWIST':
+            cache = f'TWIST_{event.input.rotation_axis}'
+
         if value != cache:
             convert = ROTATION_CONVERSION_LUT[cache][value]
 
@@ -318,11 +145,11 @@ def on_input_rotation_mode_change(event: InputRotationModeChangeEvent) -> None:
                 tuple(scalar.value for scalar in variable.data) for variable in variables
                 ], dtype=np.float)
             
-            for vector, column in zip(matrix.T if len(cache) > 4 else matrix[1:].T,
-                                    matrix.T if len(value) > 4 else matrix[1:].T):
+            for vector, column in zip(matrix.T if cache != 'EULER' else matrix[1:].T,
+                                      matrix.T if value != 'EULER' else matrix[1:].T):
                 column[:] = convert(vector)
 
-            if len(value) < 5:
+            if value == 'EULER':
                 matrix[0] = 0.0
 
             for variable, data in zip(variables, matrix):

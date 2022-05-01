@@ -23,7 +23,6 @@ if TYPE_CHECKING:
     from ..api.output_channel_data import RBFDriverOutputChannelData
     from ..api.output_channel import RBFDriverOutputChannel
     from ..api.output import RBFDriverOutput
-    from ..api.driver import RBFDriver
 
 
 ROTATION_CONVERSION_LUT = {

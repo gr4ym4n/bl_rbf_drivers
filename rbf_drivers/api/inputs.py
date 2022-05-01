@@ -1,8 +1,9 @@
 
-from bpy.types import PropertyGroup, UILayout
-from bpy.props import CollectionProperty
-from .mixins import LayerCollection
-from .input import INPUT_TYPE_INDEX, RBFDriverInput
+from typing import Optional
+from bpy.types import PropertyGroup
+from bpy.props import CollectionProperty, IntProperty
+from .mixins import Collection, Reorderable, Searchable
+from .input import INPUT_TYPE_INDEX, INPUT_TYPE_TABLE, RBFDriverInput
 from ..app.events import dataclass, dispatch_event, Event
 
 
@@ -29,22 +30,32 @@ class InputMoveEvent(Event):
     to_index: int
 
 
-class RBFDriverInputs(LayerCollection[RBFDriverInput], PropertyGroup):
+class RBFDriverInputs(Reorderable,
+                      Searchable[RBFDriverInput],
+                      Collection[RBFDriverInput],
+                      PropertyGroup):
+
+    active_index: IntProperty(
+        name="Input",
+        description="An RBF driver input",
+        min=0,
+        default=0,
+        options=set()
+        )
+
+    @property
+    def active(self) -> Optional[RBFDriverInput]:
+        index = self.active_index
+        return self[index] if index < len(self) else None
 
     collection__internal__: CollectionProperty(
         type=RBFDriverInput,
         options={'HIDDEN'}
         )
 
-    def index(self, input: RBFDriverInput) -> int:
-        if not isinstance(input, RBFDriverInput):
-            raise TypeError((f'{self.__class__.__name__}.index(input): '
-                             f'Expected input to be RBFDriverInput, not {input.__class__.__name__}'))
-        return super().index(input)
-
     def move(self, from_index: int, to_index: int) -> None:
-        if super().move(from_index, to_index):
-            dispatch_event(InputMoveEvent(self[to_index], from_index, to_index))
+        super().move(from_index, to_index)
+        dispatch_event(InputMoveEvent(self, from_index, to_index))
 
     def new(self, type: str) -> RBFDriverInput:
 
@@ -57,8 +68,7 @@ class RBFDriverInputs(LayerCollection[RBFDriverInput], PropertyGroup):
                               f'type {type} not found in {", ".join(INPUT_TYPE_INDEX)}'))
 
         input: RBFDriverInput = self.collection__internal__.add()
-        input["type"] = INPUT_TYPE_INDEX[type]
-        input.name = UILayout.enum_item_name(input, "type", type)
+        input["type"] = INPUT_TYPE_TABLE[type]
 
         dispatch_event(InputNewEvent(input))
 
@@ -72,7 +82,7 @@ class RBFDriverInputs(LayerCollection[RBFDriverInput], PropertyGroup):
                              f'Expected input to be {RBFDriverInput.__name__}, '
                              f'not {input.__class__.__name__}'))
 
-        index = next((index for item, index in enumerate(self) if item == input), -1)
+        index = next((index for index, item in enumerate(self) if item == input), -1)
 
         if index == -1:
             raise ValueError((f'{self.__class__.__name__}.remove(input): '
@@ -80,4 +90,5 @@ class RBFDriverInputs(LayerCollection[RBFDriverInput], PropertyGroup):
 
         dispatch_event(InputDisposableEvent(input))
         self.collection__internal__.remove(index)
-        dispatch_event(InputRemovedEvent(input, index))
+        self.active_index = min(self.active_index, len(self)-1)
+        dispatch_event(InputRemovedEvent(self, index))

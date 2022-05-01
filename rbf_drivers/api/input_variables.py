@@ -2,6 +2,7 @@
 from typing import Any, Iterator, List, Optional, Union, TYPE_CHECKING
 from bpy.types import PropertyGroup
 from bpy.props import CollectionProperty, IntProperty
+from .mixins import Collection, Searchable
 from .input_variable import RBFDriverInputVariable
 from ..app.events import dataclass, dispatch_event, Event
 from ..app.utils import owner_resolve
@@ -19,7 +20,7 @@ class InputVariableDisposableEvent(Event):
     variable: RBFDriverInputVariable
 
 
-class RBFDriverInputVariables(PropertyGroup):
+class RBFDriverInputVariables(Searchable, Collection[RBFDriverInputVariable], PropertyGroup):
 
     collection__internal__: CollectionProperty(
         type=RBFDriverInputVariable,
@@ -38,57 +39,27 @@ class RBFDriverInputVariables(PropertyGroup):
         index = self.active_index
         return self[index] if index < len(self) else None
 
-    def __len__(self) -> int:
-        return len(self.collection__internal__)
-
-    def __iter__(self) -> Iterator[RBFDriverInputVariable]:
-        return iter(self.collection__internal__)
-
-    def __getitem__(self, key: Union[str, int, slice]) -> Union[RBFDriverInputVariable, List[RBFDriverInputVariable]]:
-
-        if isinstance(key, str):
-            variable = next((var for var in self if var.name == key), None)
-            if variable is None:
-                raise KeyError(f'{self.__class__.__name__}[key]: "{key}" not found.')
-            return variable
-
-        if isinstance(key, int):
-            if 0 > key >= len(self):
-                raise IndexError((f'{self.__class__.__name__}[key]: '
-                                  f'Index {key} out of range 0-{len(self)}.'))
-
-            return self.collection__internal__[key]
-
-        if isinstance(key, slice):
-            return self.collection__internal__[key]
-
-        raise TypeError((f'{self.__class__.__name__}[key]: '
-                         f'Expected key to be str, int or slice, not {key.__class__.__name__}.'))
-
-    def find(self, name: str) -> int:
-        return next((index for index, variable in enumerate(self) if variable.name == name), -1)
-
-    def get(self, name: str, default: Optional[object]=None) -> Any:
-        return self.collection__internal__.get(name, default)
-
-    def index(self, variable: RBFDriverInputVariable) -> int:
-        return next(index for index, item in enumerate(self) if variable == item)
-
-    def new(self) -> RBFDriverInputVariable:
+    def new(self, name: Optional[str]="") -> RBFDriverInputVariable:
         input: 'RBFDriverInput' = owner_resolve(self, ".")
 
-        if input.type != 'NONE':
+        if input.type not in {'USER_DEF', 'SHAPE_KEY'}:
             raise RuntimeError((f'{self.__class__.__name__}.new(): '
                                 f'Variables are not mutable for inputs of type {input.type}'))
 
+        if len(self) >= 16:
+            raise RuntimeError((f'{self.__class__.__name__}.new(): '
+                                f'Maximum number of variables per input exceeded'))
+
         variable: RBFDriverInputVariable = self.collection__internal__.add()
+        variable["name"] = name
+
         dispatch_event(InputVariableNewEvent(variable))
         return variable
 
     def remove(self, variable: RBFDriverInputVariable) -> None:
         input: 'RBFDriverInput' = owner_resolve(self, ".")
 
-        if input.type != 'NONE':
+        if input.type not in {'USER_DEF', 'SHAPE_KEY'}:
             raise RuntimeError((f'{self.__class__.__name__}.remove(variable): '
                                 f'Variables are not mutable for inputs of type {input.type}'))
 
@@ -103,8 +74,9 @@ class RBFDriverInputVariables(PropertyGroup):
             raise ValueError((f'{self.__class__.__name__}.remove(variable): '
                               f'{variable} is not a member of this collection'))
 
+        if len(self) == 1:
+            raise RuntimeError((f'{self.__class__.__name__}.remove(variable): '
+                                f'Inputs must have at least one variable to remain operational'))
+
         dispatch_event(InputVariableDisposableEvent(variable))
         self.collection__internal__.remove(index)
-
-    def search(self, identifier: str) -> Optional[RBFDriverInputVariable]:
-        return next((variable for variable in self if variable.identifier == identifier), None)

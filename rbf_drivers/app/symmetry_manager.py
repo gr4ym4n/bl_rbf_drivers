@@ -4,6 +4,8 @@
 import re
 from typing import TYPE_CHECKING, Any, Dict, Match, Tuple
 from logging import getLogger
+
+from rbf_drivers.lib import rotation_utils
 from .utils import owner_resolve
 from .events import event_handler
 from ..lib.symmetry import symmetrical_target
@@ -14,7 +16,6 @@ from ..api.input_target import (InputTargetBoneTargetUpdateEvent,
                                 InputTargetRotationModeUpdateEvent,
                                 InputTargetTransformSpaceUpdateEvent,
                                 InputTargetTransformTypeUpdateEvent)
-from ..api.input_variable_data_sample import InputVariableDataSampleUpdateEvent
 from ..api.input_variable_data import InputVariableDataUpdateEvent
 from ..api.input_variable import (InputVariableDefaultValueUpdateEvent,
                                   InputVariableIsEnabledUpdateEvent,
@@ -24,14 +25,14 @@ from ..api.input_variable import (InputVariableDefaultValueUpdateEvent,
 from ..api.input_variables import InputVariableDisposableEvent, InputVariableNewEvent
 from ..api.inputs import InputDisposableEvent, InputNewEvent, InputMoveEvent
 from ..api.poses import PoseNewEvent, PoseDisposableEvent
-from ..api.output_channel import (OutputChannelBoneTargetChangeEvent,
-                                  OutputChannelDataPathUpdateEvent,
-                                  OutputChannelIDTypeUpdateEvent,
-                                  OutputChannelIsEnabledUpdateEvent,
-                                  OutputChannelIsInvertedUpdateEvent,
-                                  OutputChannelMuteUpdateEvent, OutputChannelObjectChangeEvent)
-from ..api.output import (OutputNameUpdateEvent,
+from ..api.output_channel import OutputChannelMuteUpdateEvent
+from ..api.output import (OutputBoneTargetChangeEvent,
+                          OutputDataPathChangeEvent,
+                          OutputIDTypeUpdateEvent,
+                          OutputNameUpdateEvent,
+                          OutputObjectChangeEvent,
                           OutputRotationModeChangeEvent,
+                          OutputUseAxisUpdateEvent,
                           OutputUseLogarithmicMapUpdateEvent)
 from ..api.drivers import DriverDisposableEvent
 if TYPE_CHECKING:
@@ -67,19 +68,19 @@ def symmetrical_datapath(path: str) -> str:
 
 
 def set_attribute(driver: 'RBFDriver', struct: object, name: str, value: Any) -> None:
-    driver.symmetry_lock__internal__ = True
+    driver["symmetry_lock"] = True
     try:
         setattr(struct, name, value)
     finally:
-        driver.symmetry_lock__internal__ = False
+        driver["symmetry_lock"] = False
 
 
 def call_method(driver: 'RBFDriver', struct: object, name: str, *args: Tuple[Any], **kwargs: Dict[str, Any]) -> Any:
-    driver.symmetry_lock__internal__ = True
+    driver["symmetry_lock"] = True
     try:
         return getattr(struct, name)(*args, **kwargs)
     finally:
-        driver.symmetry_lock__internal__ = False
+        driver["symmetry_lock"] = False
 
 
 def set_symmetry_target(object: Symmetrical, mirror: Symmetrical) -> None:
@@ -190,7 +191,7 @@ def resolve_pose_mirror(pose: 'RBFDriverPose') -> Tuple['RBFDriver', 'RBFDriverP
 
 def resolve_driver_mirror(driver: 'RBFDriver') -> 'RBFDriver':
 
-    if driver.symmetry_lock__internal__:
+    if driver["symmetry_lock"]:
         raise SymmetryLock()
 
     m_driver = driver.id_data.rbf_drivers.search(driver.symmetry_identifier)
@@ -294,29 +295,6 @@ def on_input_target_transform_type_update(event: InputTargetTransformTypeUpdateE
 
 #region Input Variable Event Handlers
 ###################################################################################################
-
-@event_handler(InputVariableDataSampleUpdateEvent)
-def on_input_variable_data_sample_update(event: InputVariableDataSampleUpdateEvent) -> None:
-    variable: RBFDriverInputVariable = owner_resolve(event.sample, ".data.")
-    if variable.has_symmetry_target:
-        try:
-            driver, mirror = resolve_input_variable_mirror(variable)
-        except SymmetryLock:
-            return
-        except SymmetryError as error:
-            log.error(error.message)
-        else:
-            index = event.sample.index
-            if index >= len(mirror.data):
-                log.error()
-                return
-
-            value = event.sample.value
-            if mirror.is_inverted:
-                value = value * -1
-
-            call_method(driver, mirror.data[index], "update", value)
-
 
 @event_handler(InputVariableDataUpdateEvent)
 def on_input_variable_data_update(event: InputVariableDataUpdateEvent) -> None:
@@ -507,74 +485,6 @@ def on_pose_disposable(event: PoseDisposableEvent) -> None:
 #region Output Channel Event Handlers
 ###################################################################################################
 
-@event_handler(OutputChannelBoneTargetChangeEvent)
-def on_output_channel_bone_target_change(event: OutputChannelBoneTargetChangeEvent) -> None:
-    if event.channel.has_symmetry_target:
-        try:
-            driver, mirror = resolve_output_channel_mirror(event.channel)
-        except SymmetryLock:
-            return
-        except SymmetryError as error:
-            log.error(error.message)
-        else:
-            value = symmetrical_target(event.value) or event.value
-            set_attribute(driver, mirror, "bone_target", value)
-
-
-@event_handler(OutputChannelDataPathUpdateEvent)
-def on_output_channel_data_path_update(event: OutputChannelDataPathUpdateEvent) -> None:
-    if event.channel.has_symmetry_target:
-        try:
-            driver, mirror = resolve_output_channel_mirror(event.channel)
-        except SymmetryLock:
-            return
-        except SymmetryError as error:
-            log.error(error.message)
-        else:
-            value = symmetrical_datapath(event.value)
-            set_attribute(driver, mirror, "data_path", value)
-
-
-@event_handler(OutputChannelIDTypeUpdateEvent)
-def on_output_channel_id_type_update(event: OutputChannelIDTypeUpdateEvent) -> None:
-    if event.channel.has_symmetry_target:
-        try:
-            driver, mirror = resolve_output_channel_mirror(event.channel)
-        except SymmetryLock:
-            return
-        except SymmetryError as error:
-            log.error(error.message)
-        else:
-            set_attribute(driver, mirror, "id_type", event.value)
-
-
-@event_handler(OutputChannelIsEnabledUpdateEvent)
-def on_output_channel_is_enabled_update(event: OutputChannelIsEnabledUpdateEvent) -> None:
-    if event.channel.has_symmetry_target:
-        try:
-            driver, mirror = resolve_output_channel_mirror(event.channel)
-        except SymmetryLock:
-            return
-        except SymmetryError as error:
-            log.error(error.message)
-        else:
-            set_attribute(driver, mirror, "is_enabled", event.value)
-
-
-@event_handler(OutputChannelIsInvertedUpdateEvent)
-def on_output_channel_is_inverted_update(event: OutputChannelIsInvertedUpdateEvent) -> None:
-    if event.channel.has_symmetry_target:
-        try:
-            driver, mirror = resolve_output_channel_mirror(event.channel)
-        except SymmetryLock:
-            return
-        except SymmetryError as error:
-            log.error(error.message)
-        else:
-            # TODO invert data
-            set_attribute(driver, mirror, "is_inverted", event.value)
-
-
 @event_handler(OutputChannelMuteUpdateEvent)
 def on_output_channel_mute_update(event: OutputChannelMuteUpdateEvent) -> None:
     if event.channel.has_symmetry_target:
@@ -587,12 +497,100 @@ def on_output_channel_mute_update(event: OutputChannelMuteUpdateEvent) -> None:
         else:
             set_attribute(driver, mirror, "mute", event.value)
 
+#endregion Output Channel Event Handlers
 
-@event_handler(OutputChannelObjectChangeEvent)
-def on_output_channel_object_update(event: OutputChannelObjectChangeEvent) -> None:
-    if event.channel.has_symmetry_target:
+#region Output Event Handlers
+###################################################################################################
+
+@event_handler(OutputBoneTargetChangeEvent)
+def on_output_bone_target_change(event: OutputBoneTargetChangeEvent) -> None:
+    if event.output.has_symmetry_target:
         try:
-            driver, mirror = resolve_output_channel_mirror(event.channel)
+            driver, mirror = resolve_output_mirror(event.output)
+        except SymmetryLock:
+            return
+        except SymmetryError as error:
+            log.error(error.message)
+        else:
+            value = symmetrical_target(event.value) or event.value
+            set_attribute(driver, mirror, "bone_target", value)
+
+
+@event_handler(OutputDataPathChangeEvent)
+def on_output_data_path_update(event: OutputDataPathChangeEvent) -> None:
+    if event.output.has_symmetry_target:
+        try:
+            driver, mirror = resolve_output_mirror(event.output)
+        except SymmetryLock:
+            return
+        except SymmetryError as error:
+            log.error(error.message)
+        else:
+            value = symmetrical_datapath(event.value)
+            set_attribute(driver, mirror, "data_path", value)
+
+
+@event_handler(OutputIDTypeUpdateEvent)
+def on_output_id_type_update(event: OutputIDTypeUpdateEvent) -> None:
+    if event.output.has_symmetry_target:
+        try:
+            driver, mirror = resolve_output_mirror(event.output)
+        except SymmetryLock:
+            return
+        except SymmetryError as error:
+            log.error(error.message)
+        else:
+            set_attribute(driver, mirror, "id_type", event.value)
+
+
+def invert_output_values(src_output: 'RBFDriverOutput',
+                         tgt_driver: 'RBFDriver',
+                         tgt_output: 'RBFDriverOutput',
+                         pose_index: int) -> None:
+    type = src_output.type
+    mode = src_output.rotation_mode
+
+    if type != tgt_output.type or (type == 'ROTATION' and mode != tgt_output.rotation_mode):
+        # TODO error message
+        raise RuntimeError()
+
+    data = [channel.data[pose_index].value for channel in src_output.channels]
+
+    if type == 'ROTATION':
+        if mode == 'EULER':
+            data = data[1:]
+        else:
+            data = getattr(rotation_utils, f'{mode.lower()}_to_euler')(data)
+
+    imap = (src_output.invert_x, src_output.invert_y, src_output.invert_z)
+    data = tuple(value * -1 if invert else value for value, invert in zip(data, imap))
+    
+    if type == 'ROTATION':
+        if   mode == 'QUATERNION': data = rotation_utils.euler_to_quaternion(data)
+        elif mode == 'AXIS_ANGLE': data = rotation_utils.euler_to_axis_angle(data, True)
+
+    for channel, value in zip(tgt_output.channels, data):
+        set_attribute(tgt_driver, channel.data[pose_index], "value", value)
+
+
+@event_handler(OutputNameUpdateEvent)
+def on_output_name_update(event: OutputNameUpdateEvent) -> None:
+    if event.output.has_symmetry_target:
+        try:
+            driver, mirror = resolve_output_mirror(event.output)
+        except SymmetryLock:
+            return
+        except SymmetryError as error:
+            log.error(error.message)
+        else:
+            set_attribute(driver, mirror, "name", event.value)
+
+
+@event_handler(OutputObjectChangeEvent)
+def on_output_object_update(event: OutputObjectChangeEvent) -> None:
+    if event.output.has_symmetry_target:
+        try:
+            driver, mirror = resolve_output_mirror(event.output)
         except SymmetryLock:
             return
         except SymmetryError as error:
@@ -606,23 +604,6 @@ def on_output_channel_object_update(event: OutputChannelObjectChangeEvent) -> No
                     if name in bpy.data.objects:
                         value = bpy.data.objects[name]
             set_attribute(driver, mirror, "object", value)
-
-#endregion Output Channel Event Handlers
-
-#region Output Event Handlers
-###################################################################################################
-
-@event_handler(OutputNameUpdateEvent)
-def on_output_name_update(event: OutputNameUpdateEvent) -> None:
-    if event.output.has_symmetry_target:
-        try:
-            driver, mirror = resolve_output_mirror(event.output)
-        except SymmetryLock:
-            return
-        except SymmetryError as error:
-            log.error(error.message)
-        else:
-            set_attribute(driver, mirror, "name", event.value)
 
 
 @event_handler(OutputRotationModeChangeEvent)
@@ -638,8 +619,21 @@ def on_output_rotation_mode_change(event: OutputRotationModeChangeEvent) -> None
             set_attribute(driver, mirror, "rotation_mode", event.value)
 
 
+@event_handler(OutputUseAxisUpdateEvent)
+def on_output_use_axis_update(event: OutputUseAxisUpdateEvent) -> None:
+    if event.output.has_symmetry_target:
+        try:
+            driver, mirror = resolve_output_mirror(event.output)
+        except SymmetryLock:
+            return
+        except SymmetryError as error:
+            log.error(error.message)
+        else:
+            set_attribute(driver, mirror, f'use_{event.axis.lower()}', event.value)
+
+
 @event_handler(OutputUseLogarithmicMapUpdateEvent)
-def on_use_logarithmic_map_update(event: OutputUseLogarithmicMapUpdateEvent) -> None:
+def on_output_use_logarithmic_map_update(event: OutputUseLogarithmicMapUpdateEvent) -> None:
     if event.output.has_symmetry_target:
         try:
             driver, mirror = resolve_output_mirror(event.output)
@@ -651,7 +645,6 @@ def on_use_logarithmic_map_update(event: OutputUseLogarithmicMapUpdateEvent) -> 
             set_attribute(driver, mirror, "use_logarithmic_map", event.value)
 
 #endregion Output Event Handlers
-
 
 @event_handler(DriverDisposableEvent)
 def on_driver_disposable(event: DriverDisposableEvent) -> None:

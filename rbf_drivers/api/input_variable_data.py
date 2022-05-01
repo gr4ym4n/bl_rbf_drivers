@@ -3,9 +3,8 @@ from typing import Iterator, List, Optional, Sequence, Union
 from bpy.types import PropertyGroup
 from bpy.props import BoolProperty, CollectionProperty, FloatProperty
 import numpy as np
-from rbf_drivers.app.utils import owner_resolve
-from .input_variable_data_sample import RBFDriverInputVariableDataSample, InputVariableDataSampleUpdateEvent
-from ..app.events import dataclass, dispatch_event, event_handler, Event
+from .input_variable_data_sample import RBFDriverInputVariableDataSample
+from ..app.events import dataclass, dispatch_event, Event
 
 
 @dataclass(frozen=True)
@@ -77,12 +76,3 @@ class RBFDriverInputVariableData(PropertyGroup):
 
         if propagate:
             dispatch_event(InputVariableDataUpdateEvent(self))
-
-
-@event_handler(InputVariableDataSampleUpdateEvent)
-def on_input_variable_data_sample_update(event: InputVariableDataSampleUpdateEvent) -> None:
-    '''
-    '''
-    data: RBFDriverInputVariableData = owner_resolve(event.sample, ".data.")
-    if data.is_normalized:
-        data.update()

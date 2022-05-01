@@ -1,14 +1,12 @@
 
-from typing import Any, Iterator, List, Optional, Tuple, Union, TYPE_CHECKING
-from logging import getLogger
+from typing import Optional, TYPE_CHECKING
 from bpy.types import PropertyGroup
 from bpy.props import BoolProperty, CollectionProperty, IntProperty
+from .mixins import Collection, Reorderable, Searchable
 from .pose import RBFDriverPose
 from ..app.events import dataclass, dispatch_event, Event
 if TYPE_CHECKING:
     from bpy.types import Context
-
-log = getLogger("rbf_drivers")
 
 
 @dataclass(frozen=True)
@@ -44,7 +42,10 @@ def poses_active_index_update_handler(poses: 'RBFDriverPoses', _: 'Context') -> 
     dispatch_event(PoseActiveIndexUpdateEvent(poses, poses.active_index))
 
 
-class RBFDriverPoses(PropertyGroup):
+class RBFDriverPoses(Reorderable,
+                     Searchable[RBFDriverPose],
+                     Collection[RBFDriverPose],
+                     PropertyGroup):
 
     active_index: IntProperty(
         name="Shape Key",
@@ -85,62 +86,16 @@ class RBFDriverPoses(PropertyGroup):
         options=set()
         )
 
-    def __len__(self) -> int:
-        return len(self.collection__internal__)
-
-    def __iter__(self) -> Iterator[RBFDriverPose]:
-        return iter(self.collection__internal__)
-
-    def __getitem__(self, key: Union[str, int, slice]) -> Union[RBFDriverPose, List[RBFDriverPose]]:
-        return self.collection__internal__[key]
-
-    def find(self, name: str) -> int:
-        return self.collection__internal__.find(name)
-
-    def get(self, name: str, default: Any) -> Any:
-        return self.collection__internal__.get(name, default)
-
-    def keys(self) -> Iterator[str]:
-        return iter(self.collection__internal__.keys())
-
-    def index(self, pose: RBFDriverPose) -> int:
-        if not isinstance(pose, RBFDriverPose):
-            raise TypeError((f'{self.__class__.__name__}.index(pose): '
-                             f'Expected pose to be RBFDriverPose, not {pose.__class__.__name__}'))
-
-        return next(index for index, item in enumerate(self) if item == pose)
-
-    def items(self) -> Iterator[Tuple[str, RBFDriverPose]]:
-        for item in self:
-            yield item.name, item
-
     def move(self, from_index: int, to_index: int) -> None:
-
-        if not isinstance(from_index, int):
-            raise TypeError((f'{self.__class__.__name__}.move(from_index, to_index): '
-                             f'Expected from_index to be int, not {from_index.__class__.__name__}'))
-
-        if not isinstance(to_index, int):
-            raise TypeError((f'{self.__class__.__name__}.move(from_index, to_index): '
-                             f'Expected to_index to be int, not {to_index.__class__.__name__}'))
-
-        if 0 > from_index >= len(self):
-            raise IndexError((f'{self.__class__.__name__}.move(from_index, to_index): '
-                              f'from_index {from_index} out of range 0-{len(self)-1}'))
-
-        if 0 > to_index >= len(self):
-            raise IndexError((f'{self.__class__.__name__}.move(from_index, to_index): '
-                              f'to_index {to_index} out of range 0-{len(self)-1}'))
-
-        if from_index != to_index:
-            self.collection__internal__.move(from_index, to_index)
-            dispatch_event(PoseMoveEvent(self[to_index], from_index, to_index))
+        super().move(from_index, to_index)
+        dispatch_event(PoseMoveEvent(self[to_index], from_index, to_index))
 
     def new(self, name: Optional[str]="") -> RBFDriverPose:
-        log.info("Adding new pose")
         pose: RBFDriverPose = self.collection__internal__.add()
         pose.name = name or "Pose"
+
         dispatch_event(PoseNewEvent(pose))
+
         self.active_index = len(self) - 1
         return pose
 
@@ -166,9 +121,3 @@ class RBFDriverPoses(PropertyGroup):
         self.active_index = min(self.active_index, len(self) - 1)
 
         dispatch_event(PoseRemovedEvent(self, index))
-
-    def search(self, identifier: str) -> Optional[RBFDriverPose]:
-        return next((item for item in self if item.identifier == identifier), None)
-
-    def values(self) -> Iterator[RBFDriverPose]:
-        return iter(self)

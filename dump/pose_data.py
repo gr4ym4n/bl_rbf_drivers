@@ -3,8 +3,8 @@ from typing import Any, Iterable, Iterator, List, Optional, Tuple, Union
 from functools import partial
 from bpy.types import PropertyGroup
 from bpy.props import BoolProperty, CollectionProperty, EnumProperty, FloatProperty, IntProperty, StringProperty
-from ..app.events import dataclass, dispatch_event, Event
-from ..lib.rotation_utils import (axis_angle_to_euler,
+from ..rbf_drivers.app.events import dataclass, dispatch_event, Event
+from ..rbf_drivers.lib.rotation_utils import (axis_angle_to_euler,
                                   axis_angle_to_quaternion,
                                   euler_to_axis_angle,
                                   euler_to_quaternion,

@@ -33,11 +33,11 @@ from .lib.curve_mapping import (BLCMAP_CurvePointProperties,
                                 BLCMAP_Curve,
                                 BLCMAP_OT_curve_copy,
                                 BLCMAP_OT_curve_paste,
-                                BLCMAP_OT_curve_edit,
-                                BLCMAP_OT_node_ensure)
+                                BLCMAP_OT_node_ensure,
+                                BLCMAP_OT_handle_type_set)
 
+from .api.selection_item import RBFDriverSelectionItem
 from .api.property_target import RBFDriverPropertyTarget
-from .api.pose_data import RBFDriverPoseDatum, RBFDriverPoseDataPathItem, RBFDriverPoseDataGroup, RBFDriverPoseData
 from .api.input_target import RBFDriverInputTarget
 from .api.input_targets import RBFDriverInputTargets
 from .api.input_variable_data_sample import RBFDriverInputVariableDataSample
@@ -59,22 +59,35 @@ from .api.driver_interpolation import RBFDriverInterpolation
 from .api.driver import RBFDriver
 from .api.drivers import RBFDrivers
 
-from .ops.input import (RBFDRIVERS_OT_input_display_settings,
-                        RBFDRIVERS_OT_input_add,
-                        RBFDRIVERS_OT_input_remove,
-                        RBFDRIVERS_OT_input_move)
+from .app import (name_manager,
+                  node_manager,
+                  property_manager,
+                  input_initialization_manager,
+                  input_target_manager,
+                  input_variable_data_manager,
+                  pose_initialization_manager,
+                  pose_weight_driver_manager,
+                  output_initialization_manager,
+                  output_channel_data_manager,
+                  output_channel_driver_manager,
+                  symmetry_manager)
 
-from .ops.output import (RBFDRIVERS_OT_output_display_settings,
-                         RBFDRIVERS_OT_output_add,
+from .ops.input import (RBFDRIVERS_OT_input_add,
+                        RBFDRIVERS_OT_input_remove,
+                        RBFDRIVERS_OT_input_decompose,
+                        RBFDRIVERS_OT_input_move_up,
+                        RBFDRIVERS_OT_input_move_down,
+                        RBFDRIVERS_OT_input_variable_add,
+                        RBFDRIVERS_OT_input_variable_remove)
+
+from .ops.output import (RBFDRIVERS_OT_output_add,
                          RBFDRIVERS_OT_output_remove,
                          RBFDRIVERS_OT_output_move_up,
                          RBFDRIVERS_OT_output_move_down)
 
-from .ops.pose import (RBFDRIVERS_OT_pose_display_settings,
-                       RBFDRIVERS_OT_pose_add,
+from .ops.pose import (RBFDRIVERS_OT_pose_add,
                        RBFDRIVERS_OT_pose_remove,
                        RBFDRIVERS_OT_pose_update,
-                       RBFDRIVERS_OT_pose_data_update,
                        RBFDRIVERS_OT_pose_move_up,
                        RBFDRIVERS_OT_pose_move_down)
 
@@ -83,37 +96,11 @@ from .ops.driver import (RBFDRIVERS_OT_new,
                          RBFDRIVERS_OT_move_up,
                          RBFDRIVERS_OT_move_down)
 
-from .gui.drivers import (RBFDRIVERS_UL_drivers,
-                          RBFDRIVERS_PT_drivers)
-
-from .gui.inputs import (RBFDRIVERS_PT_input_location_symmetry_settings,
-                         RBFDRIVERS_PT_inputs)
-
-from .gui.outputs import (RBFDRIVERS_PT_output_location_symmetry_settings,
-                          RBFDRIVERS_PT_output_rotation_settings,
-                          RBFDRIVERS_PT_outputs)
-
-from .gui.poses import (RBFDRIVERS_MT_pose_context_menu,
-                        RBFDRIVERS_UL_poses,
-                        RBFDRIVERS_PT_poses,
-                        RBFDRIVERS_PT_pose_input_values,
-                        RBFDRIVERS_PT_pose_output_values)
-
-from .app import (name_manager,
-                  node_manager,
-                  property_manager,
-                  input_initialization_manager,
-                  input_target_manager,
-                  input_variable_data_manager,
-                  input_pose_data_manager,
-                  pose_initialization_manager,
-                  pose_weight_driver_manager,
-                  output_initialization_manager,
-                  output_channel_manager,
-                  output_channel_data_manager,
-                  output_driver_manager,
-                  output_pose_data_manager,
-                  symmetry_manager)
+from .gui.generic import RBFDRIVERS_UL_selection_list
+from .gui.drivers import RBFDRIVERS_UL_drivers, RBFDRIVERS_PT_drivers, RBFDRIVERS_PT_interpolation
+from .gui.inputs import RBFDRIVERS_UL_inputs, RBFDRIVERS_PT_inputs
+from .gui.outputs import RBFDRIVERS_UL_outputs, RBFDRIVERS_PT_outputs
+from .gui.poses import RBFDRIVERS_MT_pose_context_menu, RBFDRIVERS_UL_poses, RBFDRIVERS_PT_poses
 
 def classes():
     return [
@@ -125,14 +112,11 @@ def classes():
         BLCMAP_Curve,
         BLCMAP_OT_curve_copy,
         BLCMAP_OT_curve_paste,
-        BLCMAP_OT_curve_edit,
         BLCMAP_OT_node_ensure,
+        BLCMAP_OT_handle_type_set,
         # api
+        RBFDriverSelectionItem,
         RBFDriverPropertyTarget,
-        RBFDriverPoseDatum,
-        RBFDriverPoseDataPathItem,
-        RBFDriverPoseDataGroup,
-        RBFDriverPoseData,
         RBFDriverInputTarget,
         RBFDriverInputTargets,
         RBFDriverInputVariableDataSample,
@@ -154,20 +138,20 @@ def classes():
         RBFDriver,
         RBFDrivers,
         # ops
-        RBFDRIVERS_OT_input_display_settings,
         RBFDRIVERS_OT_input_add,
         RBFDRIVERS_OT_input_remove,
-        RBFDRIVERS_OT_input_move,
-        RBFDRIVERS_OT_output_display_settings,
+        RBFDRIVERS_OT_input_decompose,
+        RBFDRIVERS_OT_input_move_up,
+        RBFDRIVERS_OT_input_move_down,
+        RBFDRIVERS_OT_input_variable_add,
+        RBFDRIVERS_OT_input_variable_remove,
         RBFDRIVERS_OT_output_add,
         RBFDRIVERS_OT_output_remove,
         RBFDRIVERS_OT_output_move_up,
         RBFDRIVERS_OT_output_move_down,
-        RBFDRIVERS_OT_pose_display_settings,
         RBFDRIVERS_OT_pose_add,
         RBFDRIVERS_OT_pose_remove,
         RBFDRIVERS_OT_pose_update,
-        RBFDRIVERS_OT_pose_data_update,
         RBFDRIVERS_OT_pose_move_up,
         RBFDRIVERS_OT_pose_move_down,
         RBFDRIVERS_OT_new,
@@ -175,19 +159,17 @@ def classes():
         RBFDRIVERS_OT_move_up,
         RBFDRIVERS_OT_move_down,
         # gui
+        RBFDRIVERS_UL_selection_list,
         RBFDRIVERS_UL_drivers,
         RBFDRIVERS_PT_drivers,
-        RBFDRIVERS_PT_input_location_symmetry_settings,
+        RBFDRIVERS_PT_interpolation,
+        RBFDRIVERS_UL_inputs,
         RBFDRIVERS_PT_inputs,
-        RBFDRIVERS_PT_output_location_symmetry_settings,
-        RBFDRIVERS_PT_output_rotation_settings,
+        RBFDRIVERS_UL_outputs,
         RBFDRIVERS_PT_outputs,
-        # RBFDRIVERS_PT_interpolation,
         RBFDRIVERS_MT_pose_context_menu,
         RBFDRIVERS_UL_poses,
         RBFDRIVERS_PT_poses,
-        RBFDRIVERS_PT_pose_input_values,
-        RBFDRIVERS_PT_pose_output_values,
         ]
 
 def register():
@@ -197,7 +179,7 @@ def register():
 
     BLCMAP_OT_curve_copy.bl_idname = "rbf_driver.curve_copy"
     BLCMAP_OT_curve_paste.bl_idname = "rbf_driver.curve_paste"
-    BLCMAP_OT_curve_edit.bl_idname = "rbf_driver.curve_edit"
+    BLCMAP_OT_handle_type_set.bl_idname = "rbf_driver.handle_type_set"
 
     for cls in classes():
         register_class(cls)

@@ -1,8 +1,9 @@
 
-from bpy.types import PropertyGroup, UILayout
-from bpy.props import BoolProperty, CollectionProperty
-from .mixins import LayerCollection
-from .output import RBFDriverOutput, output_mute, OUTPUT_TYPE_INDEX
+from typing import Optional
+from bpy.types import PropertyGroup
+from bpy.props import BoolProperty, CollectionProperty, IntProperty
+from .mixins import Collection, Reorderable, Searchable
+from .output import OUTPUT_TYPE_INDEX, RBFDriverOutput, output_mute, OUTPUT_TYPE_TABLE
 from ..app.events import dataclass, dispatch_event, Event
 
 
@@ -38,7 +39,23 @@ def outputs_mute_set(outputs: 'RBFDriverOutputs', value: bool) -> None:
         output.mute = value
 
 
-class RBFDriverOutputs(LayerCollection[RBFDriverOutput], PropertyGroup):
+class RBFDriverOutputs(Reorderable,
+                       Searchable[RBFDriverOutput],
+                       Collection[RBFDriverOutput],
+                       PropertyGroup):
+
+    active_index: IntProperty(
+        name="Output",
+        description="An RBF driver output",
+        min=0,
+        default=0,
+        options=set()
+        )
+
+    @property
+    def active(self) -> Optional[RBFDriverOutput]:
+        index = self.active_index
+        return self[index] if index < len(self) else None
 
     collection__internal__: CollectionProperty(
         type=RBFDriverOutput,
@@ -47,21 +64,15 @@ class RBFDriverOutputs(LayerCollection[RBFDriverOutput], PropertyGroup):
 
     mute: BoolProperty(
         name="Mute",
-        description="Un(mute) output drivers",
+        description="Mute/Unmute output drivers",
         get=outputs_mute,
         set=outputs_mute_set,
         options=set()
         )
 
-    def index(self, output: RBFDriverOutput) -> int:
-        if not isinstance(output, RBFDriverOutput):
-            raise TypeError((f'{self.__class__.__name__}.index(output): '
-                             f'Expected input to be RBFDriverOutput, not {output.__class__.__name__}'))
-        return super().index(output)
-
     def move(self, from_index: int, to_index: int) -> None:
-        if super.move(from_index, to_index):
-            dispatch_event(OutputMoveEvent(self[to_index], from_index, to_index))
+        super().move(from_index, to_index)
+        dispatch_event(OutputMoveEvent(self, from_index, to_index))
 
     def new(self, type: str) -> RBFDriverOutput:
 
@@ -74,8 +85,7 @@ class RBFDriverOutputs(LayerCollection[RBFDriverOutput], PropertyGroup):
                               f'type {type} not found in {", ".join(OUTPUT_TYPE_INDEX)}'))
 
         output: RBFDriverOutput = self.collection__internal__.add()
-        output["type"] = OUTPUT_TYPE_INDEX[type]
-        output.name = UILayout.enum_item_name(output, "type", type)
+        output["type"] = OUTPUT_TYPE_TABLE[type]
 
         dispatch_event(OutputNewEvent(output))
 

@@ -1,9 +1,8 @@
 
 from typing import Any, Optional, TYPE_CHECKING
-from logging import getLogger
 from bpy.types import ID, Object, PropertyGroup
 from bpy.props import EnumProperty, StringProperty, PointerProperty
-from .mixins import Symmetrical, Targetable
+from .mixins import Symmetrical
 from ..app.events import dataclass, dispatch_event, Event
 from ..app.utils import owner_resolve
 from ..lib.transform_utils import ROTATION_MODE_ITEMS, TRANSFORM_TYPE_ITEMS, TRANSFORM_SPACE_ITEMS
@@ -11,7 +10,6 @@ if TYPE_CHECKING:
     from bpy.types import Context
     from .input import RBFDriverInput
 
-log = getLogger("rbf_drivers")
 
 INPUT_TARGET_ID_TYPE_ITEMS = [
     ('OBJECT'     , "Object"  , "", 'OBJECT_DATA',                0),
@@ -34,7 +32,11 @@ INPUT_TARGET_ID_TYPE_ITEMS = [
     ('KEY'        , "Key"     , "", 'SHAPEKEY_DATA',              17),
 ]
 
-INPUT_TARGET_ID_TYPE_INDEX = {
+INPUT_TARGET_ID_TYPE_INDEX = [
+    item[1] for item in INPUT_TARGET_ID_TYPE_ITEMS
+    ]
+
+INPUT_TARGET_ID_TYPE_TABLE = {
     item[0]: item[4] for item in INPUT_TARGET_ID_TYPE_ITEMS
     }
 
@@ -135,7 +137,7 @@ def input_target_transform_type_set(target: 'RBFDriverInputTarget', value: int) 
     dispatch_event(InputTargetTransformTypeUpdateEvent(target, target.transform_type))
 
 
-class RBFDriverInputTarget(Targetable, Symmetrical, PropertyGroup):
+class RBFDriverInputTarget(Symmetrical, PropertyGroup):
 
     bone_target: StringProperty(
         name="Bone",

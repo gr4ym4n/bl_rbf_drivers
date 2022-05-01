@@ -1,61 +1,35 @@
 
 from typing import Set, TYPE_CHECKING
 from bpy.types import Operator
-from bpy.props import EnumProperty
+from bpy.props import CollectionProperty, EnumProperty, IntProperty
+from ..api.selection_item import RBFDriverSelectionItem
 from ..api.output import OUTPUT_TYPE_ITEMS
+from ..gui.generic import RBFDRIVERS_UL_selection_list
 if TYPE_CHECKING:
-    from bpy.types import Context
+    from bpy.types import Context, Event
     from ..api.outputs import RBFDriverOutputs
-
-
-class RBFDRIVERS_OT_output_display_settings(Operator):
-    bl_idname = "rbf_driver.output_display_settings"
-    bl_label = "Display Settings"
-    bl_description = "Modify output display settings"
-    bl_options = {'INTERNAL', 'UNDO'}
-
-    @classmethod
-    def poll(cls, context: 'Context') -> bool:
-        object = context.object
-        return (object is not None
-                and object.type != 'EMPTY'
-                and object.is_property_set("rbf_drivers")
-                and object.rbf_drivers.active is not None)
-
-    @staticmethod
-    def draw_func(self, context: 'Context') -> None:
-        outputs = context.object.rbf_drivers.active.outputs
-
-        layout = self.layout
-        layout.separator()
-
-        split = layout.row().split(factor=0.3)
-        
-        column = split.column()
-        column.alignment = 'RIGHT'
-        column.label(text="Display")
-
-        column = split.column()
-        column.prop(outputs, "display_mode", text="")
-        column.separator()
-        column.prop(outputs, "display_influence")
-
-        layout.separator()
-
-    def execute(self, context: 'Context') -> Set[str]:
-
-        def draw(*args) -> None:
-            RBFDRIVERS_OT_output_display_settings.draw_func(*args)
-
-        context.window_manager.popover(draw, from_active_button=True)
-        return {'FINISHED'}
+    from ..api.driver import RBFDriver
 
 
 class RBFDRIVERS_OT_output_add(Operator):
+
     bl_idname = "rbf_driver.output_add"
     bl_label = "Add Output"
     bl_description = "Add an RBF driver output"
     bl_options = {'INTERNAL', 'UNDO'}
+
+    active_index: IntProperty(
+        name="Shape",
+        min=0,
+        default=0,
+        options=set()
+        )
+
+    shape_keys: CollectionProperty(
+        name="Shapes",
+        type=RBFDriverSelectionItem,
+        options=set()
+        )
 
     type: EnumProperty(
         name="Type",
@@ -72,23 +46,67 @@ class RBFDRIVERS_OT_output_add(Operator):
                 and object.is_property_set("rbf_drivers")
                 and object.rbf_drivers.active is not None)
 
+    def invoke(self, context: 'Context', _: 'Event') -> Set[str]:
+        object = context.object
+        driver: 'RBFDriver' = object.rbf_drivers.active
+
+        if driver.type == 'SHAPE_KEY':
+            data = self.shape_keys
+            data.clear()
+
+            try:
+                key = object.data.shape_keys
+            except:
+                key = None
+
+            if key:
+                ignore = tuple(driver.outputs.keys())
+                for item in key.key_blocks[1:]:
+                    name = item.name
+
+                    if name not in ignore:
+                        item = data.add()
+                        item.name = name
+                        item.icon = 'SHAPEKEY_DATA'
+
+            return context.window_manager.invoke_props_dialog(self)
+        else:
+            return self.execute(context)
+
+    def draw(self, _: 'Context') -> None:
+        layout = self.layout
+        layout.separator()
+        layout.template_list(RBFDRIVERS_UL_selection_list.bl_idname, "",
+                             self, "shape_keys",
+                             self, "active_index")
+        layout.separator()
+
     def execute(self, context: 'Context') -> Set[str]:
-        outputs: 'RBFDriverOutputs' = context.object.rbf_drivers.active.outputs
-        outputs.new(self.type)
+        driver: 'RBFDriver' = context.object.rbf_drivers.active
+        outputs: 'RBFDriverOutputs' = driver.outputs
+
+        if driver.type == 'SHAPE_KEY':
+            for item in self.shape_keys:
+                if item.selected and item.name not in outputs:
+                    output = outputs.new('SHAPE_KEY')
+                    output.name = item.name
+                    output.object = driver.id_data
+        else:
+            outputs.new(self.type)
+
         return {'FINISHED'}
 
-
 class RBFDRIVERS_OT_output_remove(Operator):
+
     bl_idname = "rbf_driver.output_remove"
     bl_label = "Remove Output"
     bl_description = "Remove the selected RBF driver output"
-    bl_options = {'INTERNAL', 'UNDO'}
+    bl_options = {'UNDO', 'INTERNAL'}
 
     @classmethod
     def poll(cls, context: 'Context') -> bool:
         object = context.object
         return (object is not None
-                and object.type != 'EMPTY'
                 and object.is_property_set("rbf_drivers")
                 and object.rbf_drivers.active is not None
                 and object.rbf_drivers.active.outputs.active is not None)
@@ -100,20 +118,20 @@ class RBFDRIVERS_OT_output_remove(Operator):
 
 
 class RBFDRIVERS_OT_output_move_up(Operator):
+
     bl_idname = "rbf_driver.output_move_up"
-    bl_label = "Move Output Up"
-    bl_description = "Move the selected RBF driver output up within the list of outputs"
-    bl_options = {'INTERNAL', 'UNDO'}
+    bl_label = "Move Down"
+    bl_description = "Move output upwards within the list of inputs"
+    bl_options = {'UNDO', 'INTERNAL'}
 
     @classmethod
     def poll(cls, context: 'Context') -> bool:
         object = context.object
         return (object is not None
-                and object.type != 'EMPTY'
                 and object.is_property_set("rbf_drivers")
                 and object.rbf_drivers.active is not None
                 and object.rbf_drivers.active.outputs.active is not None
-                and object.rbf_drivers.active.outputs.active_index >= 1)
+                and object.rbf_drivers.active.outputs.active_index > 0)
 
     def execute(self, context: 'Context') -> Set[str]:
         outputs: 'RBFDriverOutputs' = context.object.rbf_drivers.active.outputs
@@ -122,20 +140,20 @@ class RBFDRIVERS_OT_output_move_up(Operator):
 
 
 class RBFDRIVERS_OT_output_move_down(Operator):
+
     bl_idname = "rbf_driver.output_move_down"
-    bl_label = "Move Output Down"
-    bl_description = "Move the selected RBF driver output down within the list of outputs"
-    bl_options = {'INTERNAL', 'UNDO'}
+    bl_label = "Move Down"
+    bl_description = "Move input downwards within the list of inputs"
+    bl_options = {'UNDO', 'INTERNAL'}
 
     @classmethod
     def poll(cls, context: 'Context') -> bool:
         object = context.object
         return (object is not None
-                and object.type != 'EMPTY'
                 and object.is_property_set("rbf_drivers")
                 and object.rbf_drivers.active is not None
                 and object.rbf_drivers.active.outputs.active is not None
-                and object.rbf_drivers.active.outputs.active_index < len(object.rbf_drivers.active.inputs) - 1)
+                and object.rbf_drivers.active.outputs.active_index < len(object.rbf_drivers.active.outputs) - 1)
 
     def execute(self, context: 'Context') -> Set[str]:
         outputs: 'RBFDriverOutputs' = context.object.rbf_drivers.active.outputs

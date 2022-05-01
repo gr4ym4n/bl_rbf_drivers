@@ -1,72 +1,94 @@
 
-from typing import TYPE_CHECKING
+from itertools import chain
+from operator import attrgetter
+from typing import TYPE_CHECKING, Iterator
+from .input_initialization_manager import input_variable_data_init
 from .events import event_handler
 from .utils import owner_resolve
-from ..lib.transform_utils import TRANSFORM_SPACE_INDEX
-from ..api.input_target import (InputTargetBoneTargetUpdateEvent,
-                                InputTargetObjectUpdateEvent,
-                                InputTargetTransformSpaceUpdateEvent)
+from ..api.input_target import INPUT_TARGET_ID_TYPE_TABLE
 from ..api.input_variable import InputVariableNameUpdateEvent, InputVariableTypeUpdateEvent
-from ..api.input import INPUT_ROTATION_MODE_INDEX, InputRotationModeChangeEvent
+from ..api.input_variables import InputVariableNewEvent
+from ..api.input import (InputBoneTargetUpdateEvent,
+                         InputObjectUpdateEvent,
+                         InputRotationAxisUpdateEvent,
+                         InputRotationModeChangeEvent,
+                         InputTransformSpaceChangeEvent)
+from ..lib.transform_utils import ROTATION_MODE_TABLE, TRANSFORM_SPACE_TABLE
 if TYPE_CHECKING:
+    from ..api.input_target import RBFDriverInputTarget
     from ..api.input import RBFDriverInput
+    from ..api.driver import RBFDriver
 
 
-@event_handler(InputTargetBoneTargetUpdateEvent)
-def on_input_target_bone_target_updated(event: InputTargetBoneTargetUpdateEvent) -> None:
-    '''
-    Synchronizes the bone target setting across input targets and updates input target
-    data paths for bbone inputs
-    '''
-    input: 'RBFDriverInput' = owner_resolve(event.target, ".variables")
-    value = event.value
-
-    if input.type in {'LOCATION', 'ROTATION', 'SCALE', 'BBONE'}:
-        for variable in input.variables:
-            variable.targets[0]["bone_target"] = value
-
-    if input.type == 'BBONE':
-        for variable in input.variables:
-            variable.targets[0]["data_path"] = f'pose.bones["{value}"].{variable.name}'
+targets = attrgetter("targets")
 
 
-@event_handler(InputTargetObjectUpdateEvent)
-def on_input_target_object_updated(event: InputTargetObjectUpdateEvent) -> None:
-    '''
-    Synchronizes the target object across input targets
-    '''
-    input: 'RBFDriverInput' = owner_resolve(event.target, ".variables")
-    value = event.value
+def targets_chain(input: 'RBFDriverInput') -> Iterator['RBFDriverInputTarget']:
+    return chain(*tuple(map(targets, input.variables)))
 
-    if input.type in {'LOCATION', 'ROTATION', 'SCALE', 'BBONE', 'SHAPE_KEY'}:
-        for variable in input.variables:
-            variable.targets[0]["object"] = value
+
+@event_handler(InputObjectUpdateEvent)
+def on_input_object_update(event: InputObjectUpdateEvent) -> None:
+    for target in targets_chain(event.input):
+        target["object"] = event.value
+
+
+@event_handler(InputBoneTargetUpdateEvent)
+def on_input_bone_target_update(event: InputBoneTargetUpdateEvent) -> None:
+    for target in targets_chain(event.input):
+        target["bone_target"] = event.value
+
+
+@event_handler(InputRotationAxisUpdateEvent)
+def on_input_rotation_axis_update(event: InputRotationAxisUpdateEvent) -> None:
+    if event.input.rotation_mode == 'TWIST':
+        value = ROTATION_MODE_TABLE[f'SWING_TWIST_{event.value}']
+        for target in targets_chain(event.input):
+            target["rotation_mode"] = value
 
 
 @event_handler(InputRotationModeChangeEvent)
-def on_input_target_rotation_mode_updated(event: InputRotationModeChangeEvent) -> None:
-    '''
-    Sycnrhonizes the rotation mode across input targets for rotation inputs
-    '''
+def on_input_rotation_mode_update(event: InputRotationModeChangeEvent) -> None:
     if event.input.type == 'ROTATION':
         mode = event.value
-        if   mode.startswith('SWING') : mode = 'QUATERNION'
-        elif mode.startswith('TWIST') : mode = f'SWING_{mode}'
-        for variable in event.input.variables:
-            variable.targets[0]["rotation_mode"] = INPUT_ROTATION_MODE_INDEX[mode]
+
+        if   mode == 'SWING' : mode = 'QUATERNION'
+        elif mode == 'TWIST' : mode = f'SWING_TWIST_{event.input.rotation_axis}'
+        elif mode == 'EULER' : mode = event.input.rotation_order
+
+        for target in targets_chain(event.input):
+            target["rotation_mode"] = ROTATION_MODE_TABLE[mode]
 
 
-@event_handler(InputTargetTransformSpaceUpdateEvent)
-def on_input_target_transform_space_update(event: InputTargetTransformSpaceUpdateEvent) -> None:
-    '''
-    Synchronizes the transform space across input targets for transform inputs
-    '''
-    input: 'RBFDriverInput' = owner_resolve(event.target, ".variables")
-    value = TRANSFORM_SPACE_INDEX[event.value]
+@event_handler(InputTransformSpaceChangeEvent)
+def on_input_transform_space_change(event: InputTransformSpaceChangeEvent) -> None:
+    value = TRANSFORM_SPACE_TABLE[event.value]
+    for target in targets_chain(event.input):
+        target["transform_space"] = value
 
-    if input.type in {'LOCATION', 'ROTATION', 'SCALE'}:
-        for variable in input.variables:
-            variable.targets[0]["transform_space"] = value
+
+@event_handler(InputVariableNewEvent)
+def on_input_variable_new(event: InputVariableNewEvent) -> None:
+    variable = event.variable
+
+    variable.targets["length__internal__"] = 1
+    variable.targets.collection__internal__.add()
+    variable.targets.collection__internal__.add()
+
+    input: 'RBFDriverInput' = owner_resolve(variable, ".variables")
+
+    if input.type == 'SHAPE_KEY':
+        object = input.object
+        compat = {'MESH', 'LATTICE', 'CURVE'}
+        target: 'RBFDriverInputTarget' = variable.targets[0]
+
+        target["id_type"] = INPUT_TARGET_ID_TYPE_TABLE['KEY']
+        target["id"] = object.data.shape_keys if object and object.type in compat else None
+        target["data_path"] = f'key_blocks["{variable.name}"].value'
+
+    driver: 'RBFDriver' = owner_resolve(input, ".inputs")
+    input_variable_data_init(variable.data, 0.0, len(driver.poses), True)
+
 
 
 @event_handler(InputVariableNameUpdateEvent)
@@ -85,8 +107,6 @@ def on_input_variable_type_update(event: InputVariableTypeUpdateEvent) -> None:
     Ensures the input variable has the correct number of targets
     '''
     if event.variable.type.endswith('DIFF'):
-        if len(event.variable.targets) < 2:
-            event.variable.targets['length__internal__'] = 2
-            event.variable.targets.collection__internal__.add()
+        event.variable.targets['length__internal__'] = 2
     else:
         event.variable.targets["length__internal__"] = 1

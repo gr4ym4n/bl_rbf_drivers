@@ -1,6 +1,5 @@
 
 from typing import TYPE_CHECKING
-from logging import getLogger
 from bpy.types import Context, PropertyGroup
 from bpy.props import (BoolProperty,
                        EnumProperty,
@@ -21,17 +20,19 @@ if TYPE_CHECKING:
     from .input_target import RBFDriverInputTarget
     from .input import RBFDriverInput
 
-log = getLogger("rbf_drivers")
-
 
 INPUT_VARIABLE_TYPE_ITEMS = [
-    ('SINGLE_PROP'  , "Single Property"      , "Use the value from some RNA property (Default).", 'NONE', 0),
-    ('TRANSFORMS'   , "Transform Channel"    , "Final transformation value of object or bone."  , 'NONE', 1),
-    ('ROTATION_DIFF', "Rotational Difference", "Use the angle between two bones."               , 'NONE', 2),
-    ('LOC_DIFF'     , "Distance"             , "Distance between two bones or objects."         , 'NONE', 3),
+    ('SINGLE_PROP'  , "Single Property"      , "Use the value from some RNA property (Default).", 'RNA'                         , 0),
+    ('TRANSFORMS'   , "Transform Channel"    , "Final transformation value of object or bone."  , 'DRIVER_TRANSFORM'            , 1),
+    ('ROTATION_DIFF', "Rotational Difference", "Use the angle between two bones."               , 'DRIVER_ROTATIONAL_DIFFERENCE', 2),
+    ('LOC_DIFF'     , "Distance"             , "Distance between two bones or objects."         , 'DRIVER_DISTANCE'             , 3),
     ]
 
-INPUT_VARIABLE_TYPE_INDEX = {
+INPUT_VARIABLE_TYPE_INDEX = [
+    item[0] for item in INPUT_VARIABLE_TYPE_ITEMS
+    ]
+
+INPUT_VARIABLE_TYPE_TABLE = {
     item[0]: item[4] for item in INPUT_VARIABLE_TYPE_ITEMS
     }
 
@@ -66,18 +67,7 @@ class InputVariableTypeUpdateEvent(Event):
     value: str
 
 
-def input_variable_type_get(variable: 'RBFDriverInputVariable') -> int:
-    return variable.get("type", 0)
-
-
-def input_variable_type_set(variable: 'RBFDriverInputVariable', value: int) -> None:
-    input: 'RBFDriverInput' = owner_resolve(variable, ".variables")
-
-    if input.type != 'NONE':
-        raise RuntimeError((f'{variable}.type '
-                            f'is not user-editable for {input.type} inputs.'))
-
-    variable["type"] = value
+def input_variable_type_update_handler(variable: 'RBFDriverInputVariable', _: 'Context') -> None:
     dispatch_event(InputVariableTypeUpdateEvent(variable, variable.type))
 
 
@@ -104,16 +94,20 @@ def input_variable_is_inverted_update_handler(variable: 'RBFDriverInputVariable'
     dispatch_event(InputVariableIsInvertedUpdateEvent(variable, variable.is_inverted))
 
 
-def input_variable_name_get(variable: 'RBFDriverInputVariable') -> str:
+def input_variable_name(variable: 'RBFDriverInputVariable') -> str:
     return variable.get("name", "")
 
 
 def input_variable_name_set(variable: 'RBFDriverInputVariable', value: str) -> None:
     input: 'RBFDriverInput' = owner_resolve(variable, ".variables")
 
-    if input.type not in {'NONE', 'SHAPE_KEY'}:
+    if input.type not in {'USER_DEF', 'SHAPE_KEY'}:
         raise RuntimeError((f'{variable}.name is not writable '
                             f'for {input} with type {input.type}'))
+
+    variable["name"] = value
+    if input.type == 'SHAPE_KEY':
+        variable.targets[0]["data_path"] = f'key_blocks["{value}"].value'
 
     dispatch_event(InputVariableNameUpdateEvent(variable, value))
 
@@ -216,7 +210,7 @@ def input_variable_is_valid(variable: 'RBFDriverInputVariable') -> bool:
     type = variable.type
     if type == 'SINGLE_PROP' : return input_variable_is_valid__singleprop(variable)
     if type == 'TRANSFORMS'  : return input_variable_is_valid__transforms(variable)
-    if type.endswith('DIIF') : return input_variable_is_valid__diff(variable)
+    if type.endswith('DIFF') : return input_variable_is_valid__diff(variable)
     return False
 
 
@@ -252,14 +246,17 @@ class RBFDriverInputVariable(Symmetrical, PropertyGroup):
         update=input_variable_is_inverted_update_handler
         )
 
-    @property
-    def is_valid(self) -> bool:
-        return input_variable_is_valid(self)
+    is_valid: BoolProperty(
+        name="Valid",
+        description="Whether or not the input variable is valid (read-only)",
+        get=input_variable_is_valid,
+        options=set()
+        )
 
     name: StringProperty(
         name="Name",
         description="Variable name",
-        get=input_variable_name_get,
+        get=input_variable_name,
         set=input_variable_name_set,
         options=set(),
         )
@@ -274,9 +271,16 @@ class RBFDriverInputVariable(Symmetrical, PropertyGroup):
         name="Type",
         description="The variable type",
         items=INPUT_VARIABLE_TYPE_ITEMS,
-        get=input_variable_type_get,
-        set=input_variable_type_set,
+        default=INPUT_VARIABLE_TYPE_ITEMS[0][0],
+        update=input_variable_type_update_handler,
         options=set(),
+        )
+
+    ui_expand: BoolProperty(
+        name="Expand",
+        description="Show/hide variable settings",
+        default=False,
+        options=set()
         )
 
     @property

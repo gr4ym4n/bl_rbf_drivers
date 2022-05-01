@@ -1,5 +1,4 @@
 
-import re
 from typing import Callable, Iterator, Sequence, Tuple, Union, TYPE_CHECKING
 from logging import getLogger
 from math import acos, asin, fabs, pi, sqrt
@@ -16,9 +15,19 @@ from ..api.input_target import (InputTargetPropertyUpdateEvent,
                                 InputTargetTransformSpaceUpdateEvent,
                                 InputTargetTransformTypeUpdateEvent)
 from ..api.input_variable import (input_variable_is_enabled,
+                                  InputVariableNameUpdateEvent,
                                   InputVariableIsEnabledUpdateEvent,
                                   InputVariableTypeUpdateEvent)
-from ..api.input import input_is_valid, InputRotationModeChangeEvent
+from ..api.input import (input_is_valid,
+                         InputBoneTargetUpdateEvent,
+                         InputDataTypeUpdateEvent,
+                         InputObjectUpdateEvent,
+                         InputRotationAxisUpdateEvent,
+                         InputRotationModeChangeEvent,
+                         InputTransformSpaceChangeEvent,
+                         InputTypeUpdateEvent,
+                         InputUseSwingUpdateEvent,
+                         InputRotationModeChangeEvent)
 from ..api.inputs import InputNewEvent, InputRemovedEvent
 from ..api.pose_interpolation import PoseInterpolationUpdateEvent
 from ..api.pose import PoseUpdateEvent
@@ -42,9 +51,8 @@ def distance_euclidean(a: Sequence[float], b: Sequence[float]) -> float:
     return sqrt(sum(pow(ai - bi, 2.0) for ai, bi in zip(a, b)))
 
 
-def distance_angle(a: Sequence[float], b: Sequence[float], axis: str) -> float:
-    index = 'WXYZ'.index(axis)
-    return fabs(a[index], b[index])
+def distance_angle(a: Sequence[float], b: Sequence[float]) -> float:
+    return fabs(a[0]-b[0])/pi
 
 
 def distance_quaternion(a: Sequence[float], b: Sequence[float]) -> float:
@@ -74,9 +82,9 @@ def input_distance_metric(input: 'RBFDriverInput') -> Union[Callable[[Sequence[f
 
     if type == 'ROTATION':
         mode = input.rotation_mode
-        if mode == 'QUATERNION'    : return distance_quaternion
-        if mode.startswith('SWING'): return distance_direction
-        if mode.startswith('TWIST'): return distance_angle
+        if mode == 'QUATERNION': return distance_quaternion
+        if mode == 'SWING'     : return distance_direction
+        if mode == 'TWIST'     : return distance_angle
 
     return distance_euclidean
 
@@ -215,11 +223,12 @@ def ipw_dist_metric(fcurve: 'FCurve', input: 'RBFDriverInput', index: int) -> No
 
     if input.type == 'ROTATION':
         mode = input.rotation_mode
-        if mode == 'SWING'      : return ipw_dist_metric__swing(dr, tokens, mode[-1])
-        if mode == 'TWIST'      : return ipw_dist_metric__twist(dr, tokens)
-        if mode == 'QUATERNION' : return ipw_dist_metric__quaternion(dr, tokens)
-
-    ipw_dist_metric__euclidean(dr, tokens)
+        if   mode == 'SWING'     : ipw_dist_metric__swing(dr, tokens, input.rotation_axis)
+        elif mode == 'TWIST'     : ipw_dist_metric__twist(dr, tokens)
+        elif mode == 'QUATERNION': ipw_dist_metric__quaternion(dr, tokens)
+        else                     : ipw_dist_metric__euclidean(dr, tokens)
+    else:
+        ipw_dist_metric__euclidean(dr, tokens)
 
 
 def ipw_dist_weight(fc: 'FCurve', pose: 'RBFDriverPose', rad: float) -> None:
@@ -235,17 +244,12 @@ def ipw_dist_weight(fc: 'FCurve', pose: 'RBFDriverPose', rad: float) -> None:
     tgt.id = src.id
     tgt.data_path = src.data_path
 
-    dr.expression = "0.0" if rad == 0.0 else f'1.0-({dr.expression})/{rad}*{var.name}'
+    dr.expression = f'1.0-({dr.expression})/{rad if rad > 0.0 else "1.0"}*{var.name}'
 
 
 def ipw_dist_idprop(rbfn: 'RBFDriver') -> str:
     return f'rbfn_pdst_{rbfn.identifier}'
 
-# BBone features split into 4 euclidean groups:
-# - Curvature: curve in x/y; curve out x/y
-# - Easing: ease in/out
-# - Roll: roll in/out
-# - Scale: scale in x/y/z; scale out x/y/z
 
 def ipw_dist_update(rbfn: 'RBFDriver') -> np.ndarray:
 
@@ -295,15 +299,19 @@ def ipw_zero_ensure(rbfn: 'RBFDriver') -> Sequence['FCurve']:
     return fx
 
 
-def ipw_norm_idprop(rbf_driver: 'RBFDriver') -> str:
-    return f'rbfn_pavg_{rbf_driver.identifier}'
+def ipw_norm_idprop(rbfn: 'RBFDriver') -> str:
+    return f'rbfn_pavg_{rbfn.identifier}'
 
 
-def ipw_norm_update(rbf_driver: 'RBFDriver', matrix: np.ndarray) -> Sequence['FCurve']:
-    fx = []
-    ob = rbf_driver.id_data
+def ipw_norm_update(rbfn: 'RBFDriver', matrix: np.ndarray) -> Sequence['FCurve']:
+    matrix = matrix.T
+
+    ob = rbfn.id_data
     id = ob.data
-    dp = f'["rbfn_pavg_{rbf_driver.identifier}"]'
+
+    pk = ipw_norm_idprop(rbfn)
+    dp = f'["{pk}"]'
+    fx = []
 
     for i, ipw_fx in enumerate(matrix.T):
         
@@ -332,6 +340,7 @@ def ipw_norm_update(rbf_driver: 'RBFDriver', matrix: np.ndarray) -> Sequence['FC
         dr_avg.expression = f'({"+".join(params)})/{float(len(params))}'
         fx.append(fc_avg)
 
+    idprop_array_ensure(id, pk, len(fx))
     return fx
 
 
@@ -498,6 +507,13 @@ def on_input_variable_is_enabled_update(event: InputVariableIsEnabledUpdateEvent
     pose_weight_drivers_update(owner_resolve(event.variable, ".inputs"))
 
 
+@event_handler(InputVariableNameUpdateEvent)
+def on_input_variable_name_update(event: InputVariableNameUpdateEvent) -> None:
+    input: 'RBFDriverInput' = owner_resolve(event.variable, ".variables")
+    if input.type == 'SHAPE_KEY':
+        pose_weight_drivers_update(owner_resolve(input, ".inputs"))
+
+
 @event_handler(InputVariableTypeUpdateEvent)
 def on_input_variable_type_update(event: InputVariableTypeUpdateEvent) -> None:
     '''
@@ -520,6 +536,55 @@ def on_input_removed(event: InputRemovedEvent) -> None:
     '''
     '''
     pose_weight_drivers_update(owner_resolve(event.inputs, "."))
+
+
+@event_handler(InputBoneTargetUpdateEvent)
+def on_input_InputBoneTargetUpdate(event: InputBoneTargetUpdateEvent) -> None:
+    '''
+    '''
+    pose_weight_drivers_update(owner_resolve(event.input, ".inputs"))
+
+
+@event_handler(InputDataTypeUpdateEvent)
+def on_input_InputDataTypeUpdate(event: InputDataTypeUpdateEvent) -> None:
+    '''
+    '''
+    pose_weight_drivers_update(owner_resolve(event.input, ".inputs"))
+
+
+@event_handler(InputObjectUpdateEvent)
+def on_input_InputObjectUpdate(event: InputObjectUpdateEvent) -> None:
+    '''
+    '''
+    pose_weight_drivers_update(owner_resolve(event.input, ".inputs"))
+
+
+@event_handler(InputRotationAxisUpdateEvent)
+def on_input_InputRotationAxisUpdate(event: InputRotationAxisUpdateEvent) -> None:
+    '''
+    '''
+    pose_weight_drivers_update(owner_resolve(event.input, ".inputs"))
+
+
+@event_handler(InputTransformSpaceChangeEvent)
+def on_input_InputTransformSpaceChange(event: InputTransformSpaceChangeEvent) -> None:
+    '''
+    '''
+    pose_weight_drivers_update(owner_resolve(event.input, ".inputs"))
+
+
+@event_handler(InputTypeUpdateEvent)
+def on_input_InputTypeUpdate(event: InputTypeUpdateEvent) -> None:
+    '''
+    '''
+    pose_weight_drivers_update(owner_resolve(event.input, ".inputs"))
+
+
+@event_handler(InputUseSwingUpdateEvent)
+def on_input_InputUseSwingUpdate(event: InputUseSwingUpdateEvent) -> None:
+    '''
+    '''
+    pose_weight_drivers_update(owner_resolve(event.input, ".inputs"))
 
 
 @event_handler(InputRotationModeChangeEvent)

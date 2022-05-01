@@ -1,7 +1,7 @@
 
 from typing import TYPE_CHECKING, Iterable, Optional, Union
 from bpy.types import PropertyGroup
-from bpy.props import EnumProperty, PointerProperty, StringProperty
+from bpy.props import PointerProperty, StringProperty
 from .pose_interpolation import RBFDriverPoseInterpolation
 from .mixins import Symmetrical
 from .property_target import RBFDriverPropertyTarget
@@ -31,20 +31,8 @@ class PoseUpdateEvent(Event):
 def pose_name_update_handler(pose: 'RBFDriverPose', _: 'Context') -> None:
     dispatch_event(PoseNameUpdateEvent(pose, pose.name))
 
-def pose_interpolation_curve_update_handler(pose: 'RBFDriverPose', _: 'Context') -> None:
-    pass
 
 class RBFDriverPose(Symmetrical, PropertyGroup):
-
-    interpolation_curve: EnumProperty(
-        name="Interpolation",
-        items=[
-            ('DEFAULT', "Default", "Use the default pose interpolation curve."),
-            ('CUSTOM' , "Custom" , "Use an interpolation curve unique to the pose."),
-            ],
-        default='DEFAULT',
-        update=pose_interpolation_curve_update_handler
-        )
 
     interpolation: PointerProperty(
         name="Interpolation",
