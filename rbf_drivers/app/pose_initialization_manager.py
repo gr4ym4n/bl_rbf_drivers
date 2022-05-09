@@ -8,8 +8,7 @@ def on_driver_new(event: DriverNewEvent) -> None:
     Adds the rest pose when a new driver is added, or clones poses for symmetrical drivers
     '''
     rbfn = event.driver
-    if rbfn.has_symmetry_target:
-        #TODO
-        raise NotImplementedError()
-    else:
+    # For new symmetrical RBF drivers, the symmetry manager will handle initialization of
+    # all poses.
+    if not rbfn.has_symmetry_target:
         rbfn.poses.new(name="Rest")

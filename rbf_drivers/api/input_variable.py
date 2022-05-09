@@ -44,21 +44,9 @@ class InputVariableIsEnabledUpdateEvent(Event):
 
 
 @dataclass(frozen=True)
-class InputVariableIsInvertedUpdateEvent(Event):
-    variable: 'RBFDriverInputVariable'
-    value: bool
-
-
-@dataclass(frozen=True)
 class InputVariableNameUpdateEvent(Event):
     variable: 'RBFDriverInputVariable'
     value: str
-
-
-@dataclass(frozen=True)
-class InputVariableDefaultValueUpdateEvent(Event):
-    variable: 'RBFDriverInputVariable'
-    value: float
 
 
 @dataclass(frozen=True)
@@ -69,10 +57,6 @@ class InputVariableTypeUpdateEvent(Event):
 
 def input_variable_type_update_handler(variable: 'RBFDriverInputVariable', _: 'Context') -> None:
     dispatch_event(InputVariableTypeUpdateEvent(variable, variable.type))
-
-
-def input_variable_default_value_update_handler(variable: 'RBFDriverInputVariable', _: Context) -> None:
-    dispatch_event(InputVariableDefaultValueUpdateEvent(variable, variable.default_value))
 
 
 def input_variable_is_enabled(variable: 'RBFDriverInputVariable') -> bool:
@@ -88,10 +72,6 @@ def input_variable_is_enabled_set(variable: 'RBFDriverInputVariable', value: boo
 
     variable["is_enabled"] = value
     dispatch_event(InputVariableIsEnabledUpdateEvent(variable, value))
-
-
-def input_variable_is_inverted_update_handler(variable: 'RBFDriverInputVariable', _: Context) -> None:
-    dispatch_event(InputVariableIsInvertedUpdateEvent(variable, variable.is_inverted))
 
 
 def input_variable_name(variable: 'RBFDriverInputVariable') -> str:
@@ -226,8 +206,7 @@ class RBFDriverInputVariable(Symmetrical, PropertyGroup):
         name="Default",
         description="The default value for the variable",
         default=0.0,
-        options=set(),
-        update=input_variable_default_value_update_handler
+        options=set()
         )
 
     is_enabled: BoolProperty(
@@ -236,14 +215,6 @@ class RBFDriverInputVariable(Symmetrical, PropertyGroup):
         get=input_variable_is_enabled,
         set=input_variable_is_enabled_set,
         options=set(),
-        )
-
-    is_inverted: BoolProperty(
-        name="Invert",
-        description="Invert the input variable's value when mirroring",
-        default=False,
-        options=set(),
-        update=input_variable_is_inverted_update_handler
         )
 
     is_valid: BoolProperty(

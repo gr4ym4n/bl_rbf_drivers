@@ -4,7 +4,7 @@ from bpy.types import Object, PropertyGroup
 from bpy.props import BoolProperty, EnumProperty, PointerProperty, StringProperty
 from .mixins import Symmetrical
 from .input_variables import RBFDriverInputVariables
-from ..app.events import dataclass, dispatch_event, event_handler, Event
+from ..app.events import dataclass, dispatch_event, Event
 from ..lib.transform_utils import TRANSFORM_SPACE_INDEX, TRANSFORM_SPACE_ITEMS
 if TYPE_CHECKING:
     from bpy.types import Context
@@ -33,6 +33,10 @@ INPUT_ROTATION_AXIS_INDEX = [
     item[0] for item in INPUT_ROTATION_AXIS_ITEMS
     ]
 
+INPUT_ROTATION_AXIS_TABLE = {
+    item[0]: index for index, item in enumerate(INPUT_ROTATION_AXIS_ITEMS)
+    }
+
 INPUT_ROTATION_MODE_ITEMS = [
     ('EULER'     , "Euler"     , "Euler angles"       ),
     ('QUATERNION', "Quaternion", "Quaternion rotation"),
@@ -57,6 +61,14 @@ INPUT_ROTATION_ORDER_ITEMS = [
     ('ZXY' , "ZXY" , "Euler using the ZXY rotation order."          ),
     ('ZYX' , "ZYX" , "Euler using the ZYX rotation order."          ),
     ]
+
+INPUT_ROTATION_ORDER_INDEX = [
+    item[0] for item in INPUT_ROTATION_ORDER_ITEMS
+    ]
+
+INPUT_ROTATION_ORDER_TABLE = {
+    item[0]: index for index, item in enumerate(INPUT_ROTATION_ORDER_ITEMS)
+    }
 
 INPUT_TYPE_ITEMS = [
     ('LOCATION', "Location", "Location transform channels", 'CON_LOCLIMIT' , 0),
@@ -135,6 +147,12 @@ class InputTypeUpdateEvent(Event):
 
 
 @dataclass(frozen=True)
+class InputUseMirrorXUpdateEvent(Event):
+    input: 'RBFDriverInput'
+    value: bool
+
+
+@dataclass(frozen=True)
 class InputUseSwingUpdateEvent(Event):
     input: 'RBFDriverInput'
     value: bool
@@ -160,7 +178,7 @@ def input_name_update_handler(input: 'RBFDriverInput', _: 'Context') -> None:
 
 
 def input_name_is_user_defined(input: 'RBFDriverInput') -> bool:
-    return input.get("name_is_user_defined")
+    return input.get("name_is_user_defined", False)
 
 
 def input_object_validate(input: 'RBFDriverInput', object: Object) -> None:
@@ -195,8 +213,8 @@ def input_transform_space_set(input: 'RBFDriverInput', value: int) -> None:
     cache = input_transform_space(input)
     input["transform_space"] = value
     dispatch_event(InputTransformSpaceChangeEvent(input,
-                                                  TRANSFORM_SPACE_INDEX[cache],
-                                                  TRANSFORM_SPACE_INDEX[value]))
+                                                  TRANSFORM_SPACE_INDEX[value],
+                                                  TRANSFORM_SPACE_INDEX[cache]))
 
 
 def input_type(input) -> int:
@@ -209,6 +227,10 @@ def input_type_set(input: 'RBFDriverInput', value: int) -> None:
     dispatch_event(InputTypeUpdateEvent(input,
                                         INPUT_TYPE_TABLE[value],
                                         INPUT_TYPE_TABLE[cache]))
+
+
+def input_use_mirror_x_update_handler(input: 'RBFDriverInput', _: 'Context') -> None:
+    dispatch_event(InputUseMirrorXUpdateEvent(input, input.use_mirror_x))
 
 
 def input_use_swing_update_handler(input: 'RBFDriverInput', _: 'Context') -> None:
@@ -322,6 +344,14 @@ class RBFDriverInput(Symmetrical, PropertyGroup):
         description="Show/Hide pose values in the UI",
         default=False,
         options=set()
+        )
+
+    use_mirror_x: BoolProperty(
+        name="X-Mirror",
+        description="Mirror transform values along X-axis",
+        default=True,
+        options=set(),
+        update=input_use_mirror_x_update_handler
         )
 
     variables: PointerProperty(

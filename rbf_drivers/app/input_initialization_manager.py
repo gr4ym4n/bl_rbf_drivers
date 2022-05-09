@@ -3,15 +3,12 @@ from typing import TYPE_CHECKING
 import numpy as np
 from .events import event_handler
 from .utils import owner_resolve
-from ..api.input_target import INPUT_TARGET_ID_TYPE_TABLE
 from ..api.input_variable import INPUT_VARIABLE_TYPE_TABLE
 from ..api.inputs import InputNewEvent
-from ..api.drivers import DriverNewEvent
 from ..lib.transform_utils import ROTATION_MODE_TABLE, TRANSFORM_TYPE_TABLE, TRANSFORM_SPACE_TABLE
 if TYPE_CHECKING:
     from ..api.input_variable_data import RBFDriverInputVariableData
     from ..api.input import RBFDriverInput
-    from ..api.driver import RBFDriver
 
 
 def input_variable_data_init(data: 'RBFDriverInputVariableData',
@@ -206,13 +203,3 @@ def on_input_new(event: InputNewEvent) -> None:
     '''
     input = event.input
     INPUT_INIT_FUNCS[input.type](input, len(owner_resolve(input, ".inputs").poses))
-
-
-@event_handler(DriverNewEvent)
-def on_driver_new(event: DriverNewEvent) -> None:
-    '''
-    Clones inputs for new symmetrical RBF drivers
-    '''
-    if event.driver.has_symmetry_target:
-        # TODO clone inputs for symmetrical driver
-        raise NotImplementedError()

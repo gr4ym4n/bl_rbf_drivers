@@ -9,6 +9,7 @@ from functools import partial
 import numpy as np
 from .events import event_handler
 from .utils import owner_resolve
+from ..api.input_variable_data_sample import InputVariableDataSampleUpdateEvent
 from ..api.input import InputRotationModeChangeEvent
 from ..api.pose import PoseUpdateEvent
 from ..api.poses import PoseMoveEvent, PoseNewEvent, PoseRemovedEvent
@@ -197,3 +198,8 @@ def on_pose_update(event: PoseUpdateEvent) -> None:
             data[index].update(value, propagate=False)
             data.update(propagate=False)
 
+
+@event_handler(InputVariableDataSampleUpdateEvent)
+def on_input_variable_data_sample_update(event: InputVariableDataSampleUpdateEvent) -> None:
+    data: 'RBFDriverInputVariableData' = owner_resolve(event.sample, ".data__internal__")
+    data.update(propagate=False)

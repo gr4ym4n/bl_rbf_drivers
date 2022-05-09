@@ -58,6 +58,7 @@ from .api.outputs import RBFDriverOutputs
 from .api.driver_interpolation import RBFDriverInterpolation
 from .api.driver import RBFDriver
 from .api.drivers import RBFDrivers
+from .api.preferences import RBFDriverPreferences
 
 from .app import (name_manager,
                   node_manager,
@@ -93,12 +94,22 @@ from .ops.pose import (RBFDRIVERS_OT_pose_add,
 
 from .ops.driver import (RBFDRIVERS_OT_new,
                          RBFDRIVERS_OT_remove,
+                         RBFDRIVERS_OT_symmetrize,
+                         RBFDRIVERS_OT_make_generic,
                          RBFDRIVERS_OT_move_up,
-                         RBFDRIVERS_OT_move_down)
+                         RBFDRIVERS_OT_move_down,
+                         LegacyDriver,
+                         RBFDRIVERS_UL_legacy_drivers,
+                         RBFDRIVERS_OT_upgrade)
+
+from .ops.addon import RBFDRIVERS_OT_check_for_update, RBFDRIVERS_OT_update
 
 from .gui.generic import RBFDRIVERS_UL_selection_list
-from .gui.drivers import RBFDRIVERS_UL_drivers, RBFDRIVERS_PT_drivers, RBFDRIVERS_PT_interpolation
-from .gui.inputs import RBFDRIVERS_UL_inputs, RBFDRIVERS_PT_inputs
+from .gui.drivers import (RBFDRIVERS_UL_drivers,
+                          RBFDRIVERS_MT_driver_context_menu,
+                          RBFDRIVERS_PT_drivers,
+                          RBFDRIVERS_PT_interpolation)
+from .gui.inputs import RBFDRIVERS_UL_inputs, RBFDRIVERS_MT_input_context_menu, RBFDRIVERS_PT_inputs
 from .gui.outputs import RBFDRIVERS_UL_outputs, RBFDRIVERS_PT_outputs
 from .gui.poses import RBFDRIVERS_MT_pose_context_menu, RBFDRIVERS_UL_poses, RBFDRIVERS_PT_poses
 
@@ -137,6 +148,7 @@ def classes():
         RBFDriverInterpolation,
         RBFDriver,
         RBFDrivers,
+        RBFDriverPreferences,
         # ops
         RBFDRIVERS_OT_input_add,
         RBFDRIVERS_OT_input_remove,
@@ -156,13 +168,22 @@ def classes():
         RBFDRIVERS_OT_pose_move_down,
         RBFDRIVERS_OT_new,
         RBFDRIVERS_OT_remove,
+        RBFDRIVERS_OT_symmetrize,
+        RBFDRIVERS_OT_make_generic,
         RBFDRIVERS_OT_move_up,
         RBFDRIVERS_OT_move_down,
+        LegacyDriver,
+        RBFDRIVERS_UL_legacy_drivers,
+        RBFDRIVERS_OT_upgrade,
+        RBFDRIVERS_OT_check_for_update,
+        RBFDRIVERS_OT_update,
         # gui
         RBFDRIVERS_UL_selection_list,
         RBFDRIVERS_UL_drivers,
+        RBFDRIVERS_MT_driver_context_menu,
         RBFDRIVERS_PT_drivers,
         RBFDRIVERS_PT_interpolation,
+        RBFDRIVERS_MT_input_context_menu,
         RBFDRIVERS_UL_inputs,
         RBFDRIVERS_PT_inputs,
         RBFDRIVERS_UL_outputs,

@@ -82,7 +82,7 @@ class InputTargetTransformTypeUpdateEvent(InputTargetPropertyUpdateEvent):
     value: str
 
 
-def input_target_bone_target_did_update(target: 'RBFDriverInputTarget', _: 'Context') -> None:
+def input_target_bone_target_update_handler(target: 'RBFDriverInputTarget', _: 'Context') -> None:
     dispatch_event(InputTargetBoneTargetUpdateEvent(target, target.bone_target))
 
 
@@ -112,15 +112,15 @@ def input_target_id_type_set(target: 'RBFDriverInputTarget', value: int) -> None
     dispatch_event(InputTargetIDTypeUpdateEvent(target, target.id_type))
 
 
-def input_target_object_did_update(target: 'RBFDriverInputTarget', _: 'Context') -> None:
+def input_target_object_update_handler(target: 'RBFDriverInputTarget', _: 'Context') -> None:
     dispatch_event(InputTargetObjectUpdateEvent(target, target.object))
 
 
-def input_target_rotation_mode_did_update(target: 'RBFDriverInputTarget', _: 'Context') -> None:
+def input_target_rotation_mode_update_handler(target: 'RBFDriverInputTarget', _: 'Context') -> None:
     dispatch_event(InputTargetObjectUpdateEvent(target, target.object))
 
 
-def input_target_transform_space_did_update(target: 'RBFDriverInputTarget', _: 'Context') -> None:
+def input_target_transform_space_update_handler(target: 'RBFDriverInputTarget', _: 'Context') -> None:
     dispatch_event(InputTargetTransformSpaceUpdateEvent(target, target.transform_space))
 
 
@@ -143,7 +143,7 @@ class RBFDriverInputTarget(Symmetrical, PropertyGroup):
         name="Bone",
         description="The pose bone to target",
         options=set(),
-        update=input_target_bone_target_did_update
+        update=input_target_bone_target_update_handler
         )
 
     data_path: StringProperty(
@@ -176,7 +176,7 @@ class RBFDriverInputTarget(Symmetrical, PropertyGroup):
         type=Object,
         poll=lambda self, object: self.id_type in (object.type, 'OBJECT'),
         options=set(),
-        update=input_target_object_did_update
+        update=input_target_object_update_handler
         )
 
     rotation_mode: EnumProperty(
@@ -185,7 +185,7 @@ class RBFDriverInputTarget(Symmetrical, PropertyGroup):
         items=ROTATION_MODE_ITEMS,
         default=ROTATION_MODE_ITEMS[0][0],
         options=set(),
-        update=input_target_rotation_mode_did_update
+        update=input_target_rotation_mode_update_handler
         )
 
     transform_space: EnumProperty(
@@ -194,7 +194,7 @@ class RBFDriverInputTarget(Symmetrical, PropertyGroup):
         items=TRANSFORM_SPACE_ITEMS,
         default=TRANSFORM_SPACE_ITEMS[0][0],
         options=set(),
-        update=input_target_transform_space_did_update,
+        update=input_target_transform_space_update_handler,
         )
 
     transform_type: EnumProperty(

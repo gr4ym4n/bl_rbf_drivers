@@ -1,8 +1,6 @@
 
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, Sequence, TypeVar
 from bpy.types import Menu, Panel, UIList
-from rbf_drivers.api.input import INPUT_TYPE_ICONS
-from rbf_drivers.api.output import OUTPUT_TYPE_ICONS
 from .drivers import RBFDRIVERS_PT_drivers
 from .utils import GUIUtils, idprop_data_render
 from ..lib.curve_mapping import draw_curve_manager_ui
@@ -13,12 +11,15 @@ from ..ops.pose import (RBFDRIVERS_OT_pose_add,
                         RBFDRIVERS_OT_pose_move_down)
 if TYPE_CHECKING:
     from bpy.types import Context, UILayout
+    from ..api.input_variable import RBFDriverInputVariable
     from ..api.input import RBFDriverInput
-    from ..api.inputs import RBFDriverInputs
     from ..api.output_channel import RBFDriverOutputChannel
     from ..api.output import RBFDriverOutput
     from ..api.pose import RBFDriverPose
     from ..api.driver import RBFDriver
+
+IOLayer = TypeVar("IOLayer", 'RBFDriverInput', 'RBFDriverOutput')
+IOChannel = TypeVar("IOChannel", 'RBFDriverInputVariable', 'RBFDriverOutputChannel')
 
 
 class RBFDRIVERS_UL_poses(UIList):
@@ -156,210 +157,86 @@ class RBFDRIVERS_PT_poses(GUIUtils, Panel):
 
         inputs = driver.inputs
         if len(inputs):
-            self.draw_input_values(layout, inputs, pose_index)
+            self.draw_value_sets(layout, 'INPUT', inputs, pose_index)
 
         outputs = driver.outputs
         if len(outputs):
-            self.draw_output_values(layout, outputs, pose_index)
+            self.draw_value_sets(layout, 'OUTPUT', outputs, pose_index)
 
-    def draw_input_values(self, layout: 'UILayout', inputs: 'RBFDriverInputs', pose_index: int):
+    def draw_value_sets(self, layout: 'UILayout', data_layer: str, layers: Sequence[IOLayer], pose_index: int) -> None:
         layout.separator()
-        labels, column = self.split_layout(layout)
-        labels.separator(factor=0.5)
-        labels.label(text="Inputs")
-
-        input: 'RBFDriverInput'
-        for item_index, input in enumerate(inputs):
-            subcolumn = column.column(align=True)
-            row = subcolumn.box().row()
-            row.prop(input, "ui_show_pose",
-                     text="",
-                     icon=f'DISCLOSURE_TRI_{"DOWN" if input.ui_show_pose else "RIGHT"}',
-                     emboss=False)
-            row.label(icon=INPUT_TYPE_ICONS[input.type], text=input.name)
-
-            subrow = row.row()
-            subrow.alignment = 'RIGHT'
-
-            props = subrow.operator(RBFDRIVERS_OT_pose_update.bl_idname,
-                                    icon='IMPORT',
-                                    text="",
-                                    emboss=False)
-            props.data_layer = 'INPUT'
-            props.pose_index = pose_index
-            props.item_index = item_index
-
-            if input.ui_show_pose:
-                box = subcolumn.box()
-                labels, values, decorations = self.split_layout(box, factor=0.25, align=True, decorate_fill=False)
-
-                type = input.type
-
-                if type in {'LOCATION', 'SCALE'}:
-                    for variable in input.variables:
-                        axis = variable.name
-                        labels.label(text=f'{type.title() + " " if axis == "X" else ""}{axis}')
-                        values.prop(variable.data[pose_index], "value", text="")
-                        decorations.label(icon=f'DECORATE{"_KEYFRAME" if variable.is_enabled else ""}')
-
-                elif type == 'ROTATION':
-                    variables = input.variables
-
-                    mode = input.rotation_mode
-                    if mode == 'EULER':
-                        variables = variables[1:]
-                    elif mode == 'TWIST':
-                        variables = variables['WXYZ'.index(input.rotation_axis)]
-                    
-                    for index, variable in enumerate(variables):
-                        axis = variable.name
-                        labels.label(text=f'{"Rotation " if index == 0 else ""}{axis}')
-                        values.prop(variable.data[pose_index], "value", text="")
-                        decorations.label(icon=f'DECORATE{"_KEYFRAME" if variable.is_enabled else ""}')
-
-                elif type == 'ROTATION_DIFF':
-                    labels.label(text="Difference")
-                    values.prop(input.variables[0].data[pose_index], "angle", text="")
-                    decorations.label(icon='DECORATE_KEYFRAME')
-                
-                elif type == 'LOC_DIFF':
-                    labels.label(text="Distance")
-                    values.prop(input.variables[0].data[pose_index], "value", text="")
-                    decorations.label(icon='DECORATE_KEYFRAME')
-
-                else:
-                    for variable in input.variables:
-                        labels.label(text=variable.name)
-                        values.prop(variable.data[pose_index], "value", text="")
-                        decorations.label(icon=f'DECORATE{"_KEYFRAME" if variable.is_enabled else ""}')
-
-    def draw_output_values(self, layout: 'UILayout', outputs: 'RBFDriverInputs', pose_index: int):
-
-        layout.separator()
-        labels, column = self.split_layout(layout, align=True, decorate=False)
+        labels, region = self.split_layout(layout, align=True, decorate=False)
         labels.separator(factor=1/3)
-        labels.label(text="Outputs")
-        column.scale_y = 1/1.5
+        labels.label(text=f'{data_layer.title()}s')
 
-        output: 'RBFDriverOutput'
-        for item_index, output in enumerate(outputs):
-            row = column.row()
-            box = row.box()
+        layer: IOLayer
+        for item_index, layer in enumerate(layers):
+            section = region.row()
+            content = section.column(align=True)
             
-            sub = row.column()
-            sub.scale_y = 1.6
-            props = sub.operator(RBFDRIVERS_OT_pose_update.bl_idname, icon='TRACKING_BACKWARDS', text="")
-            props.data_layer = 'OUTPUT'
+            subcol = section.column(align=True)
+            subcol.separator(factor=0.25)
+
+            props = subcol.operator(RBFDRIVERS_OT_pose_update.bl_idname, icon='TRACKING_BACKWARDS', text="")
+            props.data_layer = data_layer
             props.pose_index = pose_index
             props.item_index = item_index
 
-            row = box.row(align=True)
-            row.prop(output, "ui_show_pose",
-                     text="",
-                     icon=f'{"DOWNARROW_HLT" if output.ui_show_pose else "RIGHTARROW"}',
-                     emboss=False)
-            row.label(text=output.name)
+            header = content.column(align=True)
+            header.scale_y = 0.75
 
-            column.separator(factor=0.5)
+            header = header.box().row(align=True)
+            header.prop(layer, "ui_show_pose",
+                        text="",
+                        icon=f'{"DOWNARROW_HLT" if layer.ui_show_pose else "RIGHTARROW"}',
+                        emboss=False)
+            header.label(text=layer.name)
 
-            if output.ui_show_pose:
-                type = output.type
+            if (layer.has_symmetry_target
+                and layer.type in {'LOCATION', 'ROTATION'}
+                and layer.use_mirror_x
+                ):
+                subrow = header.row()
+                subrow.alignment = 'RIGHT'
+                subrow.label(icon='MOD_MIRROR')
+
+            if layer.ui_show_pose:
+                type = layer.type
+                channels = layer.channels if data_layer == 'OUTPUT' else layer.variables
+                fields = ["value"] * len(channels)
+
                 if type in {'LOCATION', 'SCALE'}:
                     labels = 'XYZ'
-                    fields = ["value"] * 4
-                    channels = output.channels
                 elif type == 'ROTATION':
-                    mode = output.rotation_mode
+                    mode = layer.rotation_mode
                     if mode == 'EULER':
                         labels = 'XYZ'
                         fields = ["angle"] * 4
-                        channels = output.channels[1:]
+                        channels = channels[1:]
                     else:
                         labels = 'WXYZ'
-                        fields = ["value"] * 4 if mode == 'QUATERNION' else ["angle"] + (["value"] * 4)
-                        channels = output.channels
+                        if mode == 'AXIS_ANGLE':
+                            fields[0] = "angle"
+                elif type == 'ROTATION_DIFF':
+                    labels = ["Difference"]
+                    fields[0] = "angle"
+                elif type == 'LOC_DIFF':
+                    labels = ["Distance"]
+                elif type == 'SHAPE_KEY':
+                    labels = [channel.name or "?" for channel in channels]
                 else:
-                    labels = [channel.name for channel in output.channels]
-                    fields = ["value"] * 4
-                    channels = output.channels
+                    labels = [channel.name or channel.data_path or "?" for channel in channels]
+
+                box = content.box()
+                subcol = box.column(align=True)
+                subcol.separator()
 
                 for label, field, channel in zip(labels, fields, channels):
-                    row = column.row()
-                    box = row.box()
-                    row.label(icon='BLANK1')
-                    
-                    row = box.row(align=True)
-                    row.label(icon=f'RADIOBUT_{"ON" if channel.is_enabled else "OFF"}',
-                            text=f'{label or channel.name}')
+                    row = subcol.row(align=True)
+                    row.label(icon=f'RADIOBUT_{"ON" if channel.is_enabled else "OFF"}')
+                    row.separator()
+                    row.prop(channel.data[pose_index], field, text=label)
+                    row.separator()
 
-                    row = row.row()
-                    row.alignment = 'RIGHT'
-
-                    if field == "angle":
-                        row.label(text=f'{getattr(channel.data[pose_index], field):.2f}\N{DEGREE SIGN}')
-                    else:
-                        row.label(text=f'{getattr(channel.data[pose_index], field):.3f}')
-
-                    column.separator(factor=0.5)
-
-
-        # layout.separator()
-        # labels, column = self.split_layout(layout)
-        # labels.separator(factor=0.5)
-        # labels.label(text="Outputs")
-
-        # output: 'RBFDriverOutput'
-        # for item_index, output in enumerate(outputs):
-        #     subcolumn = column.column(align=True)
-        #     row = subcolumn.box().row()
-        #     row.prop(output, "ui_show_pose",
-        #                 text="",
-        #                 icon=f'DISCLOSURE_TRI_{"DOWN" if output.ui_show_pose else "RIGHT"}',
-        #                 emboss=False)
-        #     row.label(icon=OUTPUT_TYPE_ICONS[output.type], text=output.name)
-
-        #     subrow = row.row()
-        #     subrow.alignment = 'RIGHT'
-
-        #     props = subrow.operator(RBFDRIVERS_OT_pose_update.bl_idname,
-        #                             icon='IMPORT',
-        #                             text="",
-        #                             emboss=False)
-        #     props.data_layer = 'OUTPUT'
-        #     props.pose_index = pose_index
-        #     props.item_index = item_index
-
-        #     if output.ui_show_pose:
-        #         box = subcolumn.box()
-        #         labels, values, decorations = self.split_layout(box, factor=0.25, align=True, decorate_fill=False)
-
-        #         type = output.type
-
-        #         if type in {'LOCATION', 'SCALE'}:
-        #             for channel in output.channels:
-        #                 axis = channel.name
-        #                 labels.label(text=f'{type.title() + " " if axis == "X" else ""}{axis}')
-        #                 values.prop(channel.data[pose_index], "value", text="")
-        #                 decorations.label(icon=f'DECORATE{"_KEYFRAME" if channel.is_enabled else ""}')
-
-        #         elif type == 'ROTATION':
-        #             channels = output.channels
-
-        #             mode = output.rotation_mode
-        #             if mode == 'EULER':
-        #                 channels = channels[1:]
-        #             elif mode == 'TWIST':
-        #                 channels = channels['WXYZ'.index(output.rotation_axis)]
-                    
-        #             for index, channel in enumerate(channels):
-        #                 axis = channel.name
-        #                 labels.label(text=f'{"Rotation " if index == 0 else ""}{axis}')
-        #                 values.prop(channel.data[pose_index], "value", text="")
-        #                 decorations.label(icon=f'DECORATE{"_KEYFRAME" if channel.is_enabled else ""}')
-
-        #         else:
-        #             for channel in output.channels:
-        #                 labels.label(text=channel.name)
-        #                 values.prop(channel.data[pose_index], "value", text="")
-        #                 decorations.label(icon=f'DECORATE{"_KEYFRAME" if channel.is_enabled else ""}')
-                
+                subcol.separator()
+            region.separator()

@@ -46,35 +46,35 @@ class RBFDrivers(Reorderable,
         options={'HIDDEN'}
         )
 
-    @property
-    def version(self) -> float:
-        return 2.0
-
     def new(self,
-            type: Optional[str]='NONE',
+            type: Optional[str]='GENERIC',
             name: Optional[str]="",
             mirror: Optional[RBFDriver]=None) -> RBFDriver:
 
         if mirror:
             if not isinstance(mirror, RBFDriver):
-                raise TypeError((f'{self.__class__.__name__}.new(name="", type="NONE", mirror=None): '
+                raise TypeError((f'{self.__class__.__name__}.new(name="", type="GENERIC", mirror=None): '
                                  f'Expected mirror to be NoneType or RBFDriver, not {type.__class__.__name__}'))
 
             if mirror.id_data != self.id_data:
-                raise ValueError((f'{self.__class__.__name__}.new(name="", type="NONE", mirror=None): '
-                                  f'mirror must be a member of the same collection.'))
+                raise ValueError((f'{self.__class__.__name__}.new(name="", type="GENERIC", mirror=None): '
+                                  f'mirror must be a member of the same collection of RBF drivers.'))
 
             type = mirror.type
             if not name:
                 name = symmetrical_target(mirror.name) or mirror.name
 
         if not isinstance(type, str):
-            raise TypeError((f'{self.__class__.__name__}.new(name="", type="NONE", mirror=None): '
+            raise TypeError((f'{self.__class__.__name__}.new(name="", type="GENERIC", mirror=None): '
                               f'Expected type to str, not {type.__class__.__name__}'))
 
-        if type and type not in DRIVER_TYPE_TABLE:
-            raise TypeError((f'{self.__class__.__name__}.new(name="", type="NONE", mirror=None): '
+        if type not in DRIVER_TYPE_TABLE:
+            raise TypeError((f'{self.__class__.__name__}.new(name="", type="GENERIC", mirror=None): '
                              f'type "{type}" not found in ({",".join(DRIVER_TYPE_TABLE.keys())})'))
+
+        if type == 'SHAPE_KEY' and self.id_data.type not in {'MESH', 'LATTICE', 'CURVE'}:
+            raise ValueError((f'{self.__class__.__name__}.new(name="", type="GENERIC", mirror=None): '
+                              f'type "{type}" is only valid for mesh, lattice and curve objects.'))
 
         driver = self.collection__internal__.add()
         driver["type"] = DRIVER_TYPE_TABLE[type]

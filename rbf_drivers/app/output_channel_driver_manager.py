@@ -3,6 +3,7 @@ from itertools import repeat
 from math import floor
 from typing import Iterable, List, Optional, Sequence, Tuple, TYPE_CHECKING, Union
 from mathutils import Quaternion
+from idprop.types import IDPropertyArray
 import numpy as np
 from .events import event_handler
 from .utils import driver_variables_ensure, idprop_remove, owner_resolve
@@ -14,6 +15,7 @@ from ..lib.driver_utils import (driver_ensure,
                                 DriverVariableNameGenerator)
 from ..api.pose import PoseUpdateEvent
 from ..api.poses import PoseNewEvent, PoseRemovedEvent
+from ..api.output_channel_data_sample import OutputChannelDataSampleUpdateEvent
 from ..api.output_channel import (OutputChannelMuteUpdateEvent,
                                   OutputChannelNameChangeEvent,
                                   output_channel_is_enabled)
@@ -24,6 +26,7 @@ from ..api.output import (OutputBoneTargetChangeEvent,
                           OutputRotationModeChangeEvent,
                           OutputUseAxisUpdateEvent,
                           OutputUseLogarithmicMapUpdateEvent)
+from ..api.drivers import DriverDisposableEvent
 if TYPE_CHECKING:
     from bpy.types import FCurve, Object
     from ..api.output_channel import RBFDriverOutputChannel
@@ -698,3 +701,27 @@ def on_pose_removed(event: PoseRemovedEvent) -> None:
 @event_handler(PoseUpdateEvent)
 def on_pose_update(event: PoseUpdateEvent) -> None:
     outputs_activate_valid(owner_resolve(event.pose, ".poses").outputs)
+
+
+@event_handler(DriverDisposableEvent)
+def on_driver_disposable(event: DriverDisposableEvent) -> None:
+    for output in event.driver.outputs:
+        output_deactivate(output)
+
+
+@event_handler(OutputChannelDataSampleUpdateEvent)
+def on_output_channel_data_sample_update(event: OutputChannelDataSampleUpdateEvent) -> None:
+    channel: 'RBFDriverOutputChannel' = owner_resolve(event.sample, ".data.")
+    id = channel.id
+    if id:
+        data = id.get(idprop_cdata(channel))
+        if isinstance(data, IDPropertyArray) and len(data) > event.sample.index:
+            output: 'RBFDriverOutput' = owner_resolve(channel, ".channels")
+            if output_uses_logarithmic_map(output):
+                # An update to the data sample will result in an update to the mean quaternion
+                # used when blending quaternions. Since the mean is encoded in the final quaternion
+                # blend driver we need to rebuild everything.
+                # TODO store mean quaternion as id-property so it can be updated directly.
+                output_activate__quaternion_blend(output)
+            else:
+                data[event.sample.index] = event.value

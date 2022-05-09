@@ -1,11 +1,12 @@
 
 from typing import TYPE_CHECKING
-from bpy.types import Panel, UIList
+from bpy.types import Menu, Panel, UIList
 from .utils import GUIUtils
 from ..lib.curve_mapping import draw_curve_manager_ui
 from ..api.driver import DRIVER_TYPE_ICONS
-from ..ops.driver import (RBFDRIVERS_OT_new,
+from ..ops.driver import (RBFDRIVERS_OT_make_generic, RBFDRIVERS_OT_new,
                           RBFDRIVERS_OT_remove,
+                          RBFDRIVERS_OT_symmetrize,
                           RBFDRIVERS_OT_move_up,
                           RBFDRIVERS_OT_move_down)
 if TYPE_CHECKING:
@@ -29,6 +30,20 @@ class RBFDRIVERS_UL_drivers(UIList):
                 row = layout.row()
                 row.alignment = 'RIGHT'
                 row.label(icon='MOD_MIRROR', text=mirror.name)
+
+
+class RBFDRIVERS_MT_driver_context_menu(Menu):
+    bl_label = "Driver Specials Menu"
+    bl_idname = 'RBFDRIVERS_MT_driver_context_menu'
+
+    def draw(self, _: 'Context') -> None:
+        layout = self.layout
+        layout.operator(RBFDRIVERS_OT_symmetrize.bl_idname,
+                        icon='MOD_MIRROR',
+                        text="Duplicate mirrored")
+        layout.operator(RBFDRIVERS_OT_make_generic.bl_idname,
+                        icon='DRIVER',
+                        text="Make Generic")
 
 
 class RBFDRIVERS_PT_drivers(GUIUtils, Panel):
@@ -59,6 +74,8 @@ class RBFDRIVERS_PT_drivers(GUIUtils, Panel):
             col = row.column(align=True)
             col.operator_menu_enum(RBFDRIVERS_OT_new.bl_idname, "type", text="", icon='ADD')
             col.operator(RBFDRIVERS_OT_remove.bl_idname, text="", icon='REMOVE')
+            col.separator()
+            col.menu(RBFDRIVERS_MT_driver_context_menu.bl_idname, text="", icon='DOWNARROW_HLT')
             col.separator()
             col.operator(RBFDRIVERS_OT_move_up.bl_idname, text="", icon='TRIA_UP')
             col.operator(RBFDRIVERS_OT_move_down.bl_idname, text="", icon='TRIA_DOWN')

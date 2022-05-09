@@ -1,6 +1,13 @@
 
 from bpy.types import PropertyGroup
 from bpy.props import FloatProperty, IntProperty
+from ..app.events import dataclass, dispatch_event, Event
+
+
+@dataclass(frozen=True)
+class InputVariableDataSampleUpdateEvent(Event):
+    sample: 'RBFDriverInputVariableDataSample'
+    value: float
 
 
 def input_variable_data_sample_index(sample: 'RBFDriverInputVariableDataSample') -> int:
@@ -11,8 +18,13 @@ def input_variable_data_sample_value(sample: 'RBFDriverInputVariableDataSample')
     return sample.get("value", 0.0)
 
 
+def input_variable_data_sample_value_set(sample: 'RBFDriverInputVariableDataSample', value: float) -> None:
+    sample["value"] = value
+    dispatch_event(InputVariableDataSampleUpdateEvent(sample, value))
+
+
 def input_variable_data_sample_value_normalized(sample: 'RBFDriverInputVariableDataSample') -> float:
-    return sample.get("value_normalized", 0.0)
+    return sample.get("value_normalized", input_variable_data_sample_value(sample))
 
 
 class RBFDriverInputVariableDataSample(PropertyGroup):
@@ -22,6 +34,7 @@ class RBFDriverInputVariableDataSample(PropertyGroup):
         description="The variable data sample value",
         subtype='ANGLE',
         get=input_variable_data_sample_value,
+        set=input_variable_data_sample_value_set,
         options=set()
         )
 
@@ -36,6 +49,7 @@ class RBFDriverInputVariableDataSample(PropertyGroup):
         name="Value",
         description="The variable data sample value",
         get=input_variable_data_sample_value,
+        set=input_variable_data_sample_value_set,
         options=set()
         )
 

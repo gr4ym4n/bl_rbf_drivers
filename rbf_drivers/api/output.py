@@ -122,6 +122,12 @@ class OutputUseAxisUpdateEvent(Event):
 
 
 @dataclass(frozen=True)
+class OutputUseMirrorXUpdateEvent(Event):
+    output: 'RBFDriverOutput'
+    value: bool
+
+
+@dataclass(frozen=True)
 class OutputUseLogarithmicMapUpdateEvent(Event):
     output: 'RBFDriverOutput'
     value: str
@@ -182,7 +188,7 @@ def output_is_valid(output: 'RBFDriverOutput') -> bool:
 
 
 def output_mute(output: 'RBFDriverOutput') -> bool:
-    return any(channel.mute for channel in output.channels if channel.is_enabled)
+    return all(channel.mute for channel in output.channels if channel.is_enabled)
 
 
 def output_mute_set(output: 'RBFDriverOutput', value: bool) -> None:
@@ -206,6 +212,8 @@ def output_object_update_handler(output: 'RBFDriverOutput', _: 'Context') -> Non
 
 
 def output_object_validate(output: 'RBFDriverOutput', object: Object) -> bool:
+    if output.type == 'SHAPE_KEY':
+        return object.type in {'MESH', 'LATTICE', 'CURVE'}
     return output.id_type in {object.type, 'OBJECT'}
 
 
@@ -226,6 +234,10 @@ def output_rotation_mode_is_user_defined(output: 'RBFDriverOutput') -> bool:
 
 def output_type(output: 'RBFDriverOutput') -> int:
     return output.get("type", 0)
+
+
+def output_use_mirror_x_update_handler(output: 'RBFDriverOutput', _: 'Context') -> None:
+    dispatch_event(OutputUseMirrorXUpdateEvent(output, output.use_mirror_x))
 
 
 def output_use_x_update_handler(output: 'RBFDriverOutput', _: 'Context') -> None:
@@ -369,6 +381,14 @@ class RBFDriverOutput(Symmetrical, PropertyGroup):
         description="Show/Hide pose values in the UI",
         default=False,
         options=set()
+        )
+
+    use_mirror_x: BoolProperty(
+        name="X-Mirror",
+        description="Mirror transform values along X-axis",
+        default=True,
+        options=set(),
+        update=output_use_mirror_x_update_handler
         )
 
     use_x: BoolProperty(

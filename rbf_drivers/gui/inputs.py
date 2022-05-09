@@ -1,9 +1,9 @@
 
 from typing import TYPE_CHECKING
-from bpy.types import Panel, UIList
-from rbf_drivers.api.input import INPUT_TYPE_ICONS
+from bpy.types import Menu, Panel, UIList
 from .drivers import RBFDRIVERS_PT_drivers
 from .utils import GUILayerUtils
+from ..api.input import INPUT_TYPE_ICONS
 from ..ops.input import (RBFDRIVERS_OT_input_add, RBFDRIVERS_OT_input_decompose,
                          RBFDRIVERS_OT_input_remove,
                          RBFDRIVERS_OT_input_move_up,
@@ -28,6 +28,17 @@ class RBFDRIVERS_UL_inputs(UIList):
                     icon=INPUT_TYPE_ICONS[input.type],
                     emboss=False,
                     translate=False)
+
+
+class RBFDRIVERS_MT_input_context_menu(Menu):
+    bl_label = "Input Specials Menu"
+    bl_idname = 'RBFDRIVERS_MT_input_context_menu'
+
+    def draw(self, _: 'Context') -> None:
+        layout = self.layout
+        layout.operator(RBFDRIVERS_OT_input_decompose.bl_idname,
+                        icon='RNA',
+                        text="Decompose input variables")
 
 
 class RBFDRIVERS_PT_inputs(GUILayerUtils, Panel):
@@ -61,10 +72,10 @@ class RBFDRIVERS_PT_inputs(GUILayerUtils, Panel):
         column.operator_menu_enum(RBFDRIVERS_OT_input_add.bl_idname, "type", text="", icon='ADD')
         column.operator(RBFDRIVERS_OT_input_remove.bl_idname, text="", icon='REMOVE')
         column.separator()
+        column.menu(RBFDRIVERS_MT_input_context_menu.bl_idname, text="", icon='DOWNARROW_HLT')
+        column.separator()
         column.operator(RBFDRIVERS_OT_input_move_up.bl_idname, text="", icon='TRIA_UP')
         column.operator(RBFDRIVERS_OT_input_move_down.bl_idname, text="", icon='TRIA_DOWN')
-        column.separator()
-        column.operator(RBFDRIVERS_OT_input_decompose.bl_idname, text="", icon='RNA')
 
         input = inputs.active
 
@@ -81,8 +92,13 @@ class RBFDRIVERS_PT_inputs(GUILayerUtils, Panel):
 
         layout.separator(factor=0.5)
 
-        column = self.split_layout(layout, "Channels")
+        column, decorations = self.split_layout(layout, "Channels", decorate_fill=False)
         column.prop(input, "transform_space", text="")
+
+        if input.has_symmetry_target:
+            decorations.prop(input, "use_mirror_x", text="", icon='MOD_MIRROR', toggle=True)
+        else:
+            decorations.label(icon='BLANK1')
 
         row = column.row(align=True)
         for variable in input.variables:
@@ -91,10 +107,15 @@ class RBFDRIVERS_PT_inputs(GUILayerUtils, Panel):
     def draw_rotation(self, layout: 'UILayout', context: 'Context', input: 'RBFDriverInput') -> None:
         self.draw_transform_target(layout, context, input)
         layout.separator(factor=0.5)
-        column = self.split_layout(layout, "Channels")
+        column, decorations = self.split_layout(layout, "Channels", decorate_fill=False)
 
         row = column.row()
         row.prop(input, "rotation_mode", text="")
+
+        if input.has_symmetry_target:
+            decorations.prop(input, "use_mirror_x", text="", icon='MOD_MIRROR', toggle=True)
+        else:
+            decorations.label(icon='BLANK1')
 
         mode = input.rotation_mode
         if mode == 'EULER':

@@ -4,6 +4,16 @@ from uuid import uuid4
 from bpy.types import PropertyGroup
 from bpy.props import StringProperty
 
+SYMMETRY_MAPPING_AXIS_ITEMS = [
+    ('X', "X", "Map to X axis"),
+    ('Y', "Y", "Map to Y axis"),
+    ('Z', "Z", "Map to Z axis"),
+    None,
+    ('X_NEG', "X (inverted)", "Map to inverted X axis"),
+    ('Y_NEG', "Y (inverted)", "Map to inverted Y axis"),
+    ('Z_NEG', "Z (inverted)", "Map to inverted Z axis"),
+    ]
+
 
 class PropertyGroupInterface:
     name: str

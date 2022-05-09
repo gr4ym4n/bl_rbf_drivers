@@ -90,14 +90,15 @@ class RBFDRIVERS_PT_outputs(GUILayerUtils, Panel):
             layout.separator()
             
             column = self.split_layout(layout, "Active")
-            row = column.row(align=True)
+            row = column.row()
             row.prop(output, "mute",
                      text="",
                      icon=f'CHECKBOX_{"DE" if output.mute else ""}HLT',
                      toggle=True,
+                     emboss=False,
                      invert_checkbox=True)
 
-            subrow = row.row(align=True)
+            subrow = row.row()
             subrow.enabled = not output.mute
             idprop_data_render(subrow, output.influence, text="Influence", slider=True)
 
@@ -105,8 +106,15 @@ class RBFDRIVERS_PT_outputs(GUILayerUtils, Panel):
             if driver.type == 'SHAPE_KEY':
                 column = self.split_layout(layout, "Target")
 
+                # If the output object has been changed through the python API
+                # or doesn't match because the object has been duplicated then
+                # expose it in the UI.
+                if output.object != output.id_data:
+                    column.prop(output, "object", text="", icon='OBJECT_DATA')
+
                 key = output.id
                 row = column.row()
+
                 if key:
                     row.alert = output.name not in key.key_blocks
                     row.prop_search(output, "name", key, "key_blocks", text="", icon='SHAPEKEY_DATA')
@@ -121,7 +129,15 @@ class RBFDRIVERS_PT_outputs(GUILayerUtils, Panel):
     def draw_location(self, layout: 'UILayout', context: 'Context', output: 'RBFDriverOutput') -> None:
         self.draw_transform_target(layout, context, output)
         layout.separator(factor=0.5)
-        row = self.split_layout(layout, "Channels").row(align=True)
+
+        column, decorations = self.split_layout(layout, "Channels", decorate_fill=False)
+
+        if output.has_symmetry_target:
+            decorations.prop(output, "use_mirror_x", text="", icon='MOD_MIRROR', toggle=True)
+        else:
+            decorations.label(icon='BLANK1')
+
+        row = column.row(align=True)
         row.prop(output, "use_x", text="X", toggle=True)
         row.prop(output, "use_y", text="Y", toggle=True)
         row.prop(output, "use_z", text="Z", toggle=True)
@@ -129,8 +145,14 @@ class RBFDRIVERS_PT_outputs(GUILayerUtils, Panel):
     def draw_rotation(self, layout: 'UILayout', context: 'Context', output: 'RBFDriverOutput') -> None:
         self.draw_transform_target(layout, context, output)
         layout.separator(factor=0.5)
-        column = self.split_layout(layout, "Channels")
+        column, decorations = self.split_layout(layout, "Channels", decorate_fill=False)
         column.prop(output, "rotation_mode", text="")
+
+        if output.has_symmetry_target:
+            decorations.prop(output, "use_mirror_x", text="", icon='MOD_MIRROR', toggle=True)
+        else:
+            decorations.label(icon='BLANK1')
+
         if output.rotation_mode == 'QUATERNION':
             row = column.row()
             row.alignment = 'RIGHT'
@@ -145,7 +167,9 @@ class RBFDRIVERS_PT_outputs(GUILayerUtils, Panel):
     def draw_scale(self, layout: 'UILayout', context: 'Context', output: 'RBFDriverOutput') -> None:
         self.draw_transform_target(layout, context, output)
         layout.separator(factor=0.5)
-        row = self.split_layout(layout, "Channels").row(align=True)
+
+        column = self.split_layout(layout, "Channels")
+        row = column.row(align=True)
         row.prop(output, "use_x", text="X", toggle=True)
         row.prop(output, "use_y", text="Y", toggle=True)
         row.prop(output, "use_z", text="Z", toggle=True)
