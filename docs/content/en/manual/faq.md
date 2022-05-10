@@ -17,7 +17,7 @@ In many situations, you will have an RBF driver with inputs coming from one data
 
 #### I think RBF Drivers is causing a circular dependency. What can I do?
 
-Blender's [dependency graph](https://wiki.blender.org/wiki/Source/Depsgraph) went through some much needed improvements back in version 2.8, but circular dependencies are nevertheless still very much possible. RBF drivers are carefully designed not to produce circular dependencies as long as the normal rules governing Blender's dependency graph are adhered to, but it doesn't prevent you from creating them. If you create an RBF driver that uses the location of an object to drive itself, then obviously you've created a circular dependency. If you're sure that it's the RBF driver itself that's causing the problem then [file an bug report](https://github.com/jamesvsnowden/bl_rbf_drivers/issues), but take a little time to verify your setup before you do.
+Blender's [dependency graph](https://wiki.blender.org/wiki/Source/Depsgraph) went through some much needed improvements back in version 2.8, but circular dependencies are nevertheless still very much possible. RBF drivers are carefully designed not to produce circular dependencies as long as the normal rules governing Blender's dependency graph are adhered to, but it doesn't prevent you from creating them. If you create an RBF driver that uses the location of an object to drive itself, then obviously you've created a circular dependency. If you're sure that it's the RBF driver itself that's causing the problem then [file an bug report](/support), but please take a little time to verify your setup before you do.
 
 #### What are the extra custom properties RBF Drivers is creating?
 
@@ -30,6 +30,10 @@ The short answer is no. In fact RBF drivers will under normal circumstances be a
 #### Why is my output target snapping back to it's rest pose?
 
 Each [input](/manual/inputs) [pose](/manual/poses) has a *radius* that is calculated internally as the distance to its nearest neighbor (though you can adjust it using the [radius](/manual/poses#radius) setting for the pose). If the input target values are outside of all the pose radii, the RBF driver can't calculate a weight for any of the poses and output targets will snap back to their origins. The simple solution is to create a pose that covers the input target values.
+
+#### Can I have more than one RBF driver with the same output?
+
+No. RBF drivers use Blender's native drivers to drive the driven properties, and there can only be one driver per driven property. This is entirely logical as the driven property has no way of deciding which driver value is should use. If you want to drive a property based on the output of two RBF drivers, you will need to use custom properties as the outputs for the RBF drivers and create your own driver to combine the output values. It is unlikely that you would want to do this, but if you're familiar with Blender's drivers it shouldn't be difficult and RBF drivers won't get in your way.
 
 #### Where is my license key?
 
