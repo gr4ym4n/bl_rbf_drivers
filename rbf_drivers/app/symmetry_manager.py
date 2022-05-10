@@ -254,7 +254,7 @@ def driver_interpolation_clone(symsrc: 'RBFDriverInterpolation', symtgt: 'RBFDri
 
 def pose_interpolation_clone(symsrc: 'RBFDriverPoseInterpolation', symtgt: 'RBFDriverPoseInterpolation') -> None:
     symsrc["use_curve"] = symtgt.use_curve
-    symtgt.__init__(**symtgt.__init__(**get_interpolation_curve_options(symsrc)))
+    symtgt.__init__(**get_interpolation_curve_options(symsrc))
 
 
 def input_target_clone(symsrc: 'RBFDriverInputTarget', symtgt: 'RBFDriverInputTarget') -> None:
