@@ -141,7 +141,7 @@ class RBFDRIVERS_PT_poses(GUIUtils, Panel):
         column = self.split_layout(layout, "Interpolation", decorate=False)
 
         row = column.row()
-        row.prop(interpolation, "use_curve", text="Override Default")
+        row.prop(interpolation, "use_curve", text="Override")
         row.label(icon='BLANK1')
 
         if interpolation.use_curve:
