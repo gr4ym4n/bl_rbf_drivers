@@ -57,8 +57,8 @@ class RBFDriver(Symmetrical, PropertyGroup):
         return DRIVER_TYPE_ICONS[self.type]
 
     interpolation: PointerProperty(
-        name="Falloff",
-        description="RBF driver interpolation options",
+        name="Interpolation Settings",
+        description="Default pose interpolation settings",
         type=RBFDriverInterpolation,
         options=set()
         )
@@ -93,7 +93,7 @@ class RBFDriver(Symmetrical, PropertyGroup):
 
     symmetry_lock: BoolProperty(
         name="Symmetry Lock",
-        description="Prevent symmetry property changes from infinite regression (read-only)",
+        description="Prevents symmetry property changes from infinite regression (internal-use)",
         get=driver_symmetry_lock,
         options={'HIDDEN'}
         )
