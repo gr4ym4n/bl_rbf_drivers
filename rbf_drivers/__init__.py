@@ -34,6 +34,7 @@ from .lib.curve_mapping import (BLCMAP_CurvePointProperties,
                                 BLCMAP_OT_curve_copy,
                                 BLCMAP_OT_curve_paste,
                                 BLCMAP_OT_node_ensure,
+                                BCLMAP_OT_curve_point_remove,
                                 BLCMAP_OT_handle_type_set)
 
 from .api.selection_item import RBFDriverSelectionItem
@@ -124,6 +125,7 @@ def classes():
         BLCMAP_OT_curve_copy,
         BLCMAP_OT_curve_paste,
         BLCMAP_OT_node_ensure,
+        BCLMAP_OT_curve_point_remove,
         BLCMAP_OT_handle_type_set,
         # api
         RBFDriverSelectionItem,
