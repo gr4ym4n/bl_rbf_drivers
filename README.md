@@ -10,18 +10,15 @@ RBF Drivers is an addon (plugin) for [Blender](https://www.blender.org/) that en
 
 ## Features
 
-### Fast & Intuitive Workflow
-
-Solving rigging and animation issues often requires a complex spaghetti of constraints and drivers. RBF drivers offer a uniquely friendly way to achieve very complex or otherwise impossible results extremely quickly.
-
-### Realtime & Performant
-
-RBF Drivers has been carefully designed to have the minimum runtime cost. The drivers it creates all run within Blender's dependency graph and once set up do not require python. On even moderate systems you can expect to run hundreds of simultaneous RBF drivers without any perceptible performance cost. It's very unlikely that RBF Drivers will ever be the bottleneck.
-
-### Built on native tools
-
-RBF Drivers builds on Blender's native toolset, using Blender's built-in drivers and custom properties to construct a [radial basis function network](https://en.wikipedia.org/wiki/Radial_basis_function_network) that's not hidden in scripts and code. This has the important advantage that RBF systems built with RBF Drivers can be sent down the pipeline, shared with colleagues or freinds, or even sold without the end-user needing the addon to be installed in order for it to work.
-
-### Flexibility
-
-In contrast to version 1, RBF Drivers 2 allows almost any input and output to the system. You are no longer limited to using pose bones and transforms as inputs.
+* **Intuitive workflow**  
+  Set your inputs and outputs, add some poses, and your good to go. Behind the scenes the addon builds and manages the neural network while exposing a straightforward process.
+* **Reduced complexity**  
+  RBF drivers can often replace multiple constraints and long driver chains with one simple interface, allowing riggers and animators to achieve great results quickly and stay in the flow.
+* **Exceptional control**  
+  Complete control over interpolation curves along with animatable influence on individual outputs and poses as well as per-pose interpolation options offer a very high degree of control for advanced use-cases.
+* **Excellent performance**  
+  RBF Drivers has been carefully designed such that all runtime calculations are performed in native C by Blender's dependency graph.
+* **Fully scriptable**  
+  A comprehensive python API allows RBF drivers to be built and configured entirely from script.
+* **No strings attached**  
+  Because RBF Drivers builds on Blender's native toolset, you're free to send your creations down the pipeline, share them with others or even sell them online. Once they're set up there is no requirement for the addon to be installed for the RBF drivers to keep working
