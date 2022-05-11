@@ -177,8 +177,10 @@ def on_input_target_bone_target_update(event: InputTargetBoneTargetUpdateEvent) 
 
 @event_handler(InputVariableNewEvent)
 def on_input_variable_new(event: InputVariableNewEvent) -> None:
-    variables: 'RBFDriverInputVariables' = owner_resolve(event.variable, ".")
-    event.variable["name"] = uniqname("var", [x.name for x in variables if x != event.variable], separator="_", zfill=2)
+    variable = event.variable
+    if not variable.name:
+        variables: 'RBFDriverInputVariables' = owner_resolve(variable, ".")
+        variable["name"] = uniqname("var", [x.name for x in variables if x != variable], separator="_", zfill=2)
 
 
 @event_handler(PoseNameUpdateEvent)
