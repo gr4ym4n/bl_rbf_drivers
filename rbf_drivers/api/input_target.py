@@ -92,9 +92,11 @@ def input_target_data_path(target: 'RBFDriverInputTarget') -> str:
 
 def input_target_data_path_set(target: 'RBFDriverInputTarget', value: str) -> None:
     input: 'RBFDriverInput' = owner_resolve(target, ".variables")
-    if input.type != 'NONE':
+
+    if input.type != 'USER_DEF':
         raise RuntimeError((f'{target}.data_path is not writable '
                             f'for {input} because {input} type is {input.type}'))
+
     target["data_path"] = value
     dispatch_event(InputTargetDataPathUpdateEvent(target, value))
 
@@ -105,9 +107,11 @@ def input_target_id_type(target: 'RBFDriverInputTarget') -> int:
 
 def input_target_id_type_set(target: 'RBFDriverInputTarget', value: int) -> None:
     input: 'RBFDriverInput' = owner_resolve(target, ".variables")
-    if input.type != 'NONE':
+
+    if input.type != 'USER_DEF':
         raise RuntimeError((f'{target}.id_type is not writable '
                             f'for {input} because {input} type is {input.type}'))
+
     target["id_type"] = value
     dispatch_event(InputTargetIDTypeUpdateEvent(target, target.id_type))
 
