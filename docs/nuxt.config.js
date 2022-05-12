@@ -3,7 +3,7 @@ import theme from '@nuxt/content-theme-docs'
 
 export default theme({
     docs: {
-        primaryColor: '#E24F55'
+        primaryColor: '#8b3577'
     },
     i18n: {
         locales: () => [{
