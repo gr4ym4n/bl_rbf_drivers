@@ -1,7 +1,9 @@
 ---
 title: 'Installation'
+menuTitle: 'Installation'
 description: ''
-position: 2
+category: Tutorials
+position: 102
 fullscreen: true
 ---
 
