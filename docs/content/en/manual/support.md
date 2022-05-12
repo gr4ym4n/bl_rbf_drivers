@@ -1,8 +1,9 @@
-
 ---
-title: 'Installation'
+title: Support
+menuTitle: Support
 description: ''
-position: 500
+position: 208
+category: Manual
 fullscreen: true
 ---
 
