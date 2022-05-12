@@ -2,7 +2,7 @@
 title: Pose Interpolation
 menuTitle: Pose Interpolation
 description: 'Changing RBF driver interpolation settings'
-position: 102
+position: 104
 category: Tutorials
 fullscreen: true
 ---
