@@ -63,3 +63,12 @@ class RBFDriverInputVariableDataSample(PropertyGroup):
     def __init__(self, index: int, value: float) -> None:
         self["index"] = index
         self["value"] = value
+
+    def __repr__(self) -> str:
+        return f'{self.__class__.__name__}(index={self.index}, value={self.value})'
+
+    def __str__(self) -> str:
+        path: str = self.path_from_id()
+        path = path.replace(".data__internal__", "")
+        path = path.replace(".collection__internal__", "")
+        return f'{self.__class__.__name__} @ bpy.data.objects["{self.id_data.name}"].{path}'

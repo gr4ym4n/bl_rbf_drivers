@@ -29,3 +29,12 @@ class RBFDriverPoseInterpolation(BCLMAP_CurveManager, PropertyGroup):
     def update(self) -> None:
         super().update()
         dispatch_event(PoseInterpolationUpdateEvent(self))
+
+    def __repr__(self) -> str:
+        # TODO
+        return super().__repr__()
+
+    def __str__(self) -> str:
+        path: str = self.path_from_id()
+        path = path.replace(".collection__internal__", "")
+        return f'{self.__class__.__name__} @ bpy.data.objects["{self.id_data.name}"].{path}'

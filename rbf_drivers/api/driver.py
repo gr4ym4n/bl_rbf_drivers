@@ -1,5 +1,5 @@
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 from bpy.types import PropertyGroup
 from bpy.props import BoolProperty, EnumProperty, PointerProperty, StringProperty
 from .mixins import Symmetrical
@@ -105,3 +105,26 @@ class RBFDriver(Symmetrical, PropertyGroup):
         get=driver_type,
         options=set()
         )
+
+    def __init__(self, type: str, name: Optional[str]="", mirror: Optional['RBFDriver']=None) -> None:
+        assert isinstance(type, str) and type in DRIVER_TYPE_TABLE
+        assert isinstance(name, str)
+        assert mirror is None or (isinstance(mirror, RBFDriver)
+                                  and mirror.id_data == self.id_data
+                                  and mirror != self)
+
+        self["type"] = DRIVER_TYPE_TABLE[type]
+        if name:
+            self.name = name
+
+        if mirror:
+            self["symmetry_identifier"] = mirror.identifier
+            mirror["symmetry_identifier"] = self.identifier
+
+    def __repr__(self) -> str:
+        return f'{self.__class__.__name__}(type="{self.type}", name="{self.name}")'
+
+    def __str__(self) -> str:
+        path: str = self.path_from_id()
+        path = path.replace(".collection__internal__", "")
+        return f'{self.__class__.__name__} @ bpy.data.objects["{self.id_data.name}"].{path}'

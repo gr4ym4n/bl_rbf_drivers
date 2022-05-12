@@ -65,6 +65,15 @@ class RBFDriverPose(Symmetrical, PropertyGroup):
         options=set()
         )
 
+    def __repr__(self) -> str:
+        # TODO
+        return super().__repr__()
+
+    def __str__(self) -> str:
+        path: str = self.path_from_id()
+        path = path.replace(".collection__internal__", "")
+        return f'{self.__class__.__name__} @ bpy.data.objects["{self.id_data.name}"].{path}'
+
     def update(self,
                inputs : Optional[Union[bool, Iterable['RBFDriverInput' ]]]=True,
                outputs: Optional[Union[bool, Iterable['RBFDriverOutput']]]=True) -> None:

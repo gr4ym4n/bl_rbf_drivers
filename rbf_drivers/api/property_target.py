@@ -49,3 +49,13 @@ class RBFDriverPropertyTarget(PropertyGroup):
 
         if isinstance(value, float):
             return value
+
+    def __repr__(self) -> str:
+        return (f'{self.__class__.__name__}(id={self.id}, '
+                                          f'name={self.name}'
+                                          f'{", array_index=" + str(self.array_index) if self.is_array else ""})')
+
+    def __str__(self) -> str:
+        path: str = self.path_from_id()
+        path = path.replace(".collection__internal__", "")
+        return f'{self.__class__.__name__} @ bpy.data.objects["{self.id_data.name}"].{path}'

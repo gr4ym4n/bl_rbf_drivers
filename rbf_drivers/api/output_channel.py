@@ -155,3 +155,20 @@ class RBFDriverOutputChannel(Symmetrical, PropertyGroup):
                         if isinstance(value, (float, int, bool)):
                             return float(value)
         return 0.0
+
+    def __repr__(self) -> str:
+        result = f'{self.__class__.__name__}(name="{self.name}"'
+        result += f', id={self.id}'
+        result += f', data_path="{self.data_path}"'
+        if self.is_property_set("array_index"):
+            result += f', array_index={self.array_index}'
+        result += f', default_value={self.default_value}'
+        result += f', is_enabled={self.is_enabled}'
+        result += f', mute={self.mute}'
+        result += ")"
+        return result
+
+    def __str__(self) -> str:
+        path: str = self.path_from_id()
+        path = path.replace(".collection__internal__", "")
+        return f'{self.__class__.__name__} @ bpy.data.objects["{self.id_data.name}"].{path}'

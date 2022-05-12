@@ -70,6 +70,14 @@ class RBFDriverOutputs(Reorderable,
         options=set()
         )
 
+    def __repr__(self) -> str:
+        return f'{self.__class__.__name__}(active_index={self.active_index})'
+
+    def __str__(self) -> str:
+        path: str = self.path_from_id()
+        path = path.replace(".collection__internal__", "")
+        return f'{self.__class__.__name__} @ bpy.data.objects["{self.id_data.name}"].{path}'
+
     def move(self, from_index: int, to_index: int) -> None:
         super().move(from_index, to_index)
         dispatch_event(OutputMoveEvent(self, from_index, to_index))

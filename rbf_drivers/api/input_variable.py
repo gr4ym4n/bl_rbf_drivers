@@ -1,5 +1,5 @@
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Dict, List, Optional, Tuple, Union
 from bpy.types import Context, PropertyGroup
 from bpy.props import (BoolProperty,
                        EnumProperty,
@@ -21,18 +21,18 @@ if TYPE_CHECKING:
     from .input import RBFDriverInput
 
 
-INPUT_VARIABLE_TYPE_ITEMS = [
+INPUT_VARIABLE_TYPE_ITEMS: List[Tuple[str, str, str, str, int]] = [
     ('SINGLE_PROP'  , "Single Property"      , "Use the value from some RNA property (Default).", 'RNA'                         , 0),
     ('TRANSFORMS'   , "Transform Channel"    , "Final transformation value of object or bone."  , 'DRIVER_TRANSFORM'            , 1),
     ('ROTATION_DIFF', "Rotational Difference", "Use the angle between two bones."               , 'DRIVER_ROTATIONAL_DIFFERENCE', 2),
     ('LOC_DIFF'     , "Distance"             , "Distance between two bones or objects."         , 'DRIVER_DISTANCE'             , 3),
     ]
 
-INPUT_VARIABLE_TYPE_INDEX = [
+INPUT_VARIABLE_TYPE_INDEX: List[str] = [
     item[0] for item in INPUT_VARIABLE_TYPE_ITEMS
     ]
 
-INPUT_VARIABLE_TYPE_TABLE = {
+INPUT_VARIABLE_TYPE_TABLE: Dict[str, int] = {
     item[0]: item[4] for item in INPUT_VARIABLE_TYPE_ITEMS
     }
 
@@ -264,3 +264,38 @@ class RBFDriverInputVariable(Symmetrical, PropertyGroup):
         if type == 'LOC_DIFF'      : return input_variable_value__loc_diff(self)
         if type == 'ROTATION_DIFF' : return input_variable_value__rotation_diff(self)
         return input_variable_value__single_prop(self)
+
+    def __init__(self,
+                 type: Optional[Union[int, str]]=None,
+                 default_value: Optional[float]=None,
+                 is_enabled: Optional[bool]=None) -> None:
+        
+        assert (type is None
+                or (isinstance(type, int) and 0 <= type < len(INPUT_VARIABLE_TYPE_INDEX))
+                or (isinstance(type, str) and type in INPUT_VARIABLE_TYPE_TABLE))
+
+        assert isinstance(default_value, (int, bool, float))
+        assert isinstance(is_enabled, (int, bool))
+
+        if isinstance(type, str):
+            type = INPUT_VARIABLE_TYPE_TABLE[type]
+
+        if type is not None:
+            self["type"] = type
+
+        if default_value is not None:
+            self["default_value"] = bool(default_value)
+
+        if is_enabled is not None:
+            self["is_enabled"] = bool(is_enabled)
+
+    def __repr__(self) -> str:
+        return (f'{self.__class__.__name__}(type="{self.type}", '
+                                          f'name={self.name}'
+                                          f'default_value={self.default_value})'
+                                          f'is_enabled={self.is_enabled}')
+
+    def __str__(self) -> str:
+        path: str = self.path_from_id()
+        path = path.replace(".collection__internal__", "")
+        return f'{self.__class__.__name__} @ bpy.data.objects["{self.id_data.name}"].{path}'

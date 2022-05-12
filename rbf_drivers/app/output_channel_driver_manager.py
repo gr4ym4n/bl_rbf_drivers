@@ -518,7 +518,7 @@ def output_activate(output: 'RBFDriverOutput') -> None:
 def output_channel_deactivate__weighted_average(output: 'RBFDriverOutput',
                                                 channel: 'RBFDriverOutputChannel') -> None:
     id = channel.id
-    if id:
+    if id and channel.data_path:
         driver_remove(id, *output_channel_data_target(channel))
     id = output.id_data.data
     idprop_remove(id, idprop_cnode(channel), remove_drivers=True)

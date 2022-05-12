@@ -65,26 +65,13 @@ class RBFDriverPoses(Reorderable,
         options={'HIDDEN'}
         )
 
-    display_influence: BoolProperty(
-        name="Influence",
-        description="Show/Hide influence in list",
-        default=True,
-        options=set()
-        )
+    def __repr__(self) -> str:
+        return f'{self.__class__.__name__}(active_index={self.active_index})'
 
-    display_radius: BoolProperty(
-        name="Radius",
-        description="Show/Hide radius in list",
-        default=True,
-        options=set()
-        )
-
-    display_weight: BoolProperty(
-        name="Weight",
-        description="Show/Hide weight in list",
-        default=True,
-        options=set()
-        )
+    def __str__(self) -> str:
+        path: str = self.path_from_id()
+        path = path.replace(".collection__internal__", "")
+        return f'{self.__class__.__name__} @ bpy.data.objects["{self.id_data.name}"].{path}'
 
     def move(self, from_index: int, to_index: int) -> None:
         super().move(from_index, to_index)

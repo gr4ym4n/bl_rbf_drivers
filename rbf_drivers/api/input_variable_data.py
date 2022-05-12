@@ -51,6 +51,15 @@ class RBFDriverInputVariableData(PropertyGroup):
 
         self.update(propagate=False)
 
+    def __repr__(self) -> str:
+        return (f'{self.__class__.__name__}(values={str(self.values())}, '
+                                          f'normalize={self.is_normalized})')
+
+    def __str__(self) -> str:
+        path: str = self.path_from_id()
+        path = path.replace(".collection__internal__", "")
+        return f'{self.__class__.__name__} @ bpy.data.objects["{self.id_data.name}"].{path}'
+
     def value(self, index: int, normalized: Optional[bool]=False) -> float:
         return self[index].value_normalized if normalized else self[index].value
 
