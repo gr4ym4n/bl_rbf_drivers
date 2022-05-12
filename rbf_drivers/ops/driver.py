@@ -1,21 +1,28 @@
 
-from dataclasses import dataclass
+from itertools import filterfalse
 from operator import attrgetter
-from typing import Dict, Iterator, List, Optional, Sequence, Set, Tuple, Union, TYPE_CHECKING
-from bpy.types import Object, Operator, PropertyGroup, UIList
+from typing import Iterator, List, Optional, Set, Tuple, Union, TYPE_CHECKING
+from bpy.types import Object, Operator, PropertyGroup
 from bpy.props import BoolProperty, CollectionProperty, EnumProperty, IntProperty, StringProperty
 from mathutils import Matrix
 import numpy as np
-from rbf_drivers.app.property_manager import pose_idprops_create
-from rbf_drivers.app.utils import idprop_remove
-from ..api.input import INPUT_ROTATION_AXIS_TABLE, INPUT_ROTATION_MODE_TABLE, INPUT_ROTATION_ORDER_TABLE
-from ..api.driver import DRIVER_TYPE_TABLE
 from ..lib.symmetry import is_symmetrical, symmetrical_target
-from ..lib.rotation_utils import quaternion_to_euler, quaternion_to_swing_twist_x, quaternion_to_swing_twist_y, quaternion_to_swing_twist_z
+from ..lib.rotation_utils import (quaternion_to_euler,
+                                  quaternion_to_swing_twist_x,
+                                  quaternion_to_swing_twist_y,
+                                  quaternion_to_swing_twist_z)
+from ..api.input import (INPUT_ROTATION_AXIS_TABLE,
+                         INPUT_ROTATION_MODE_TABLE,
+                         INPUT_ROTATION_ORDER_TABLE)
+from ..api.driver import DRIVER_TYPE_TABLE
+from ..app.name_manager import outputname
+from ..app.output_channel_driver_manager import outputs_activate_valid
+from ..app.pose_weight_driver_manager import pose_weight_drivers_update
+from ..app.property_manager import pose_idprops_create
+from ..app.utils import idprop_remove
 if TYPE_CHECKING:
-    from bpy.types import Context, Event, ID, PoseBone, UILayout
+    from bpy.types import Context, Event, PoseBone
     from idprop.types import IDPropertyGroup
-    from ..api.input import RBFDriverInput
     from ..api.driver import RBFDriver
     from ..api.drivers import RBFDrivers
 
@@ -236,25 +243,11 @@ class LegacyDriver(PropertyGroup):
         options=set()
         )
 
-
-class RBFDRIVERS_UL_legacy_drivers(UIList):
-    def draw(self, _0, layout: 'UILayout', _1, item: 'LegacyDriver', _2, _3, _4) -> None:
-        row = layout.row()
-
-        subrow = row.row(align=True)
-        subrow.alignment = 'LEFT'
-        subrow.label(text=item.name, icon='DRIVER')
-        subrow.label(text='(')
-        subrow.label(text=item.data_target, icon='OBJECT_DATA')
-        subrow.label(icon='RIGHTARROW_THIN')
-        subrow.label(text=item.bone_target, icon='BONE_DATA')
-        subrow.label(text='(')
-
-        subrow = row.row()
-        subrow.alignment = 'RIGHT'
-        subrow.prop(item, "import_flag",
-                    text="",
-                    icon=f'CHECKBOX_{"" if item.import_flag else "DE"}HLT')
+    show_detail: BoolProperty(
+        name="Show Detail",
+        default=False,
+        options=set()
+        )
 
 
 class RBFDRIVERS_OT_upgrade(Operator):
@@ -291,9 +284,10 @@ class RBFDRIVERS_OT_upgrade(Operator):
 
         for object in filter(is_armature, context.blend_data.objects):
             for bone in object.pose.bones:
-                for index, _ in enumerate(iter_drivers(bone)):
+                for index, data in enumerate(iter_drivers(bone)):
                     item: LegacyDriver = items.add()
                     item.index = index
+                    item.name = data.get("name", "")
                     item.data_target = object.name
                     item.bone_target = bone.name
 
@@ -305,14 +299,38 @@ class RBFDRIVERS_OT_upgrade(Operator):
             context.window_manager.popup_menu(draw, title="Upgrade RBF Drivers")
             return {'CANCELLED'}
 
-        return context.window_manager.invoke_props_dialog(self)
+        return context.window_manager.invoke_props_dialog(self, width=300)
 
     def draw(self, _: 'Context') -> None:
         layout = self.layout
         layout.separator()
-        layout.template_list(RBFDRIVERS_UL_legacy_drivers.bl_idname, "",
-                             self, "legacy_drivers",
-                             self, "active_index")
+
+        column = layout.column(align=True)
+        for item in self.legacy_drivers:
+            row = column.box().row()
+
+            row.prop(item, "show_detail",
+                     text="",
+                     icon=f'{"DOWNARROW_HLT" if item.show_detail else "RIGHTARROW"}',
+                     emboss=False)
+
+            row.label(text=item.name, icon='DRIVER')
+            row.prop(item, "import_flag",
+                     text="",
+                     icon=f'CHECKBOX_{"" if item.import_flag else "DE"}HLT',
+                     emboss=False)
+
+            if item.show_detail:
+                box = column.box()
+
+                row = box.row()
+                row.label(icon='BLANK1')
+                row.label(icon='OBJECT_DATA', text=item.data_target)
+
+                row = box.row()
+                row.label(icon='BLANK1')
+                row.label(icon='BONE_DATA', text=item.bone_target)
+
         layout.separator()
 
     def execute(self, context: 'Context') -> Set[str]:
@@ -340,7 +358,14 @@ class RBFDRIVERS_OT_upgrade(Operator):
             identity = (1., 0., 0., 0., 0., 1., 0., 0., 0., 0., 1., 0., 0., 0., 0., 1.)
 
             for index, item in enumerate(data.get("poses", {}).get("data__internal", [])):
+
                 values = tuple(item.get("matrix", identity))
+                # matrix = Matrix((values[:4], values[4:8], values[8:12], values[12:]))
+                matrix = Matrix(((values[0], values[4], values[8] , values[12]),
+                                 (values[1], values[5], values[9] , values[13]),
+                                 (values[2], values[6], values[10], values[14]),
+                                 (values[3], values[7], values[11], values[15])))
+                posedata.append(matrix)
 
                 if index == 0:
                     pose = driver.poses[0]
@@ -351,8 +376,6 @@ class RBFDRIVERS_OT_upgrade(Operator):
                     pose_idprops_create(pose)
                     pose.interpolation.__init__(type='SIGMOID', interpolation='LINEAR')
 
-                posedata.append(Matrix((values[:4], values[4:8], values[8:12], values[12:])))
-
             # Location Input
             flags = tuple(map(bool, data.get("use_location", (0, 0, 0))))
             if any(flags):
@@ -360,14 +383,10 @@ class RBFDRIVERS_OT_upgrade(Operator):
                 input.object = bone.id_data
                 input.bone_target = bone.name
 
-                matrix = np.array([matrix.to_translation() for matrix in posedata], dtype=float)
-
+                matrix = np.array([m.to_translation() for m in posedata], dtype=float)
                 for variable, flag, values in zip(input.variables, flags, matrix.T):
                     variable["is_enabled"] = flag
-
-                    samples = variable.data.data__internal__
-                    for index, value in enumerate(values):
-                        samples.add().__init__(index, value)
+                    variable.data.__init__(values)
 
             # Rotation Input
             flags = tuple(map(bool, data.get("use_rotation", (0, 0, 0, 0))))
@@ -457,30 +476,25 @@ class RBFDRIVERS_OT_upgrade(Operator):
 
                 for variable, flag, values in zip(input.variables, flags, matrix.T):
                     variable["is_enabled"] = flag
-
-                    samples = variable.data.data__internal__
-                    for index, value in enumerate(values):
-                        samples.add().__init__(index, value)
+                    variable.data.__init__(values)
 
             # Scale Input
-            flags = tuple(map(bool, self.data.get("use_scale", (0, 0, 0))))
+            flags = tuple(map(bool, data.get("use_scale", (0, 0, 0))))
             if any(flags):
-                input = self.driver.inputs.new(type='SCALE')
-                input.object = self.bone.id_data
-                input.bone_target = self.bone.name
+                input = driver.inputs.new(type='SCALE')
+                input.object = bone.id_data
+                input.bone_target = bone.name
 
-                matrix = np.array([matrix.to_scale() for matrix in self.posedata], dtype=float)
-
+                matrix = np.array([m.to_scale() for m in posedata], dtype=float)
                 for variable, flag, values in zip(input.variables, flags, matrix.T):
                     variable["is_enabled"] = flag
+                    variable.data.__init__(values)
 
-                    samples = variable.data.data__internal__
-                    for index, value in enumerate(values):
-                        samples.add().__init__(index, value)
+            pose_weight_drivers_update(driver)
 
             TRANSFORM_TYPES = (
-                'LOC_X', 'LOC_Y', 'LOC_Z',
-                'ROT_W', 'ROT_X', 'ROT_Y', 'ROT_Z',
+                'LOC_X', 'LOC_Y', 'LOC_Z', '',
+                'ROT_W', 'ROT_X', 'ROT_Y', 'ROT_Z', '',
                 'SCALE_X', 'SCALE_Y', 'SCALE_Z')
 
             for item in driven:
@@ -488,7 +502,7 @@ class RBFDRIVERS_OT_upgrade(Operator):
                 sampledata = [x.get("value", 0.0) for x in item.get("samples", {}).get("data__internal", [])]
 
                 # Single Property Output
-                if type == 0:
+                if type == 1:
                     output = driver.outputs.new(type='SINGLE_PROP')
                     output.channels[0].data.__init__(sampledata)
                     output.object = item.get("id", None)
@@ -502,7 +516,7 @@ class RBFDRIVERS_OT_upgrade(Operator):
                     output.name = item.get("shape_key", "")
 
                 # TRANSFORM
-                elif type == 1:
+                elif type == 0:
                     type = TRANSFORM_TYPES[item.get("transform_type", 0)]
                     if type.startswith('LOC'):
                         output = None
@@ -518,6 +532,7 @@ class RBFDRIVERS_OT_upgrade(Operator):
                             output = driver.outputs.new(type='LOCATION')
                             output.object = item.get("id", None)
                             output.bone_target = item.get("bone_target", "")
+                            output["name"] = outputname(output)
 
                         output[f"use_{type[-1].lower()}"] = True
 
@@ -539,7 +554,8 @@ class RBFDRIVERS_OT_upgrade(Operator):
                             output = driver.outputs.new(type='ROTATION')
                             output.object = item.get("id", None)
                             output.bone_target = item.get("bone_target", "")
-                            output.rotation_mode = ('EULER', 'AXIS_ANGLE', 'QUATERNION')[item.get("rotation_mode", 2)]
+                            output.rotation_mode = ('EULER', 'AXIS_ANGLE', 'QUATERNION')[item.get("rotation_mode", 0)]
+                            output["name"] = outputname(output)
 
                         if output.rotation_mode == 'EULER':
                             output[f"use_{type[-1].lower()}"] = True
@@ -562,6 +578,7 @@ class RBFDRIVERS_OT_upgrade(Operator):
                             output = driver.outputs.new(type='SCALE')
                             output.object = item.get("id", None)
                             output.bone_target = item.get("bone_target", "")
+                            output["name"] = outputname(output)
 
                         output[f"use_{type[-1].lower()}"] = True
                         
@@ -574,16 +591,33 @@ class RBFDRIVERS_OT_upgrade(Operator):
                 prefix = 'RBF'
                 suffix = f'rbfn.{str(id).zfill(3)}'
 
-                for key in bone.id_data.data.keys():
+                for key in list(bone.id_data.data.keys()):
                     if key.startswith(prefix) and key.endswith(suffix):
                         idprop_remove(bone.id_data.data, key, remove_drivers=True)
 
-                for key in bone.keys():
+                for key in list(bone.keys()):
                     if key.startswith(prefix) and key.endswith(suffix):
                         idprop_remove(bone, key, remove_drivers=True)
 
-            try:
-                del bone["rbf_drivers"]
-            except: pass
+            outputs_activate_valid(driver.outputs)
+
+        for legacy in filter(attrgetter("import_flag"), self.legacy_drivers):
+            bone = context.blend_data.objects[legacy.data_target].pose.bones[legacy.bone_target]
+            data = list(bone["rbf_drivers"]["data__internal"])
+
+            data[legacy.index] = {"removed": 1}
+            if any(item.get("removed", 0) for item in data):
+                bone["rbf_drivers"]["data__internal"] = data
+
+        for legacy in filter(attrgetter("import_flag"), self.legacy_drivers):
+            bone = context.blend_data.objects[legacy.data_target].pose.bones[legacy.bone_target]
+            data = bone.get("rbf_drivers", {}).get("data__internal__", [])
+            data = list(filterfalse(lambda item: item.get("removed", 0), data))
+            if not len(data):
+                try:
+                    del bone["rbf_drivers"]
+                except: pass
+
+            
 
         return {'FINISHED'}

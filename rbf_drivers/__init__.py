@@ -100,7 +100,6 @@ from .ops.driver import (RBFDRIVERS_OT_new,
                          RBFDRIVERS_OT_move_up,
                          RBFDRIVERS_OT_move_down,
                          LegacyDriver,
-                         RBFDRIVERS_UL_legacy_drivers,
                          RBFDRIVERS_OT_upgrade)
 
 from .ops.addon import RBFDRIVERS_OT_check_for_update, RBFDRIVERS_OT_update
@@ -175,7 +174,6 @@ def classes():
         RBFDRIVERS_OT_move_up,
         RBFDRIVERS_OT_move_down,
         LegacyDriver,
-        RBFDRIVERS_UL_legacy_drivers,
         RBFDRIVERS_OT_upgrade,
         RBFDRIVERS_OT_check_for_update,
         RBFDRIVERS_OT_update,
