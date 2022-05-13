@@ -1,5 +1,5 @@
 
-from typing import TYPE_CHECKING, Iterable, List, Optional, Sequence
+from typing import TYPE_CHECKING, Dict, Iterable, List, Optional, Sequence
 from logging import getLogger
 from .events import event_handler
 from .utils import owner_resolve
@@ -23,7 +23,7 @@ if TYPE_CHECKING:
 
 log = getLogger(__name__)
 
-DEFAULT_INPUT_NAMES = {
+DEFAULT_INPUT_NAMES: Dict[str, str] = {
     'LOCATION'     : "Location",
     'ROTATION'     : "Rotation",
     'SCALE'        : "Scale",
@@ -33,7 +33,7 @@ DEFAULT_INPUT_NAMES = {
     'USER_DEF'     : "Property",
     }
 
-DEFAULT_OUTPUT_NAMES = {
+DEFAULT_OUTPUT_NAMES: Dict[str, str] = {
     'LOCATION'     : "Location",
     'ROTATION'     : "Rotation",
     'SCALE'        : "Scale",
