@@ -3,6 +3,7 @@ from cmath import isnan
 from typing import TYPE_CHECKING, Optional, Union
 from bpy.types import Object, PropertyGroup
 from bpy.props import BoolProperty, EnumProperty, PointerProperty, StringProperty
+from rbf_drivers.api.input_variable import input_variable_is_enabled, input_variable_is_valid
 from .mixins import Symmetrical
 from .input_variables import RBFDriverInputVariables
 from ..app.events import dataclass, dispatch_event, Event
@@ -168,10 +169,8 @@ def input_data_type_update_handler(input: 'RBFDriverInput', _: 'Context') -> Non
 
 
 def input_is_valid(input: 'RBFDriverInput') -> bool:
-    for variable in input.variables:
-        if variable.is_enabled and not variable.is_valid:
-            return False
-    return True
+    variables = tuple(filter(input_variable_is_enabled, input.variables))
+    return bool(len(variables)) and all(map(input_variable_is_valid, variables))
 
 
 def input_name_update_handler(input: 'RBFDriverInput', _: 'Context') -> None:
