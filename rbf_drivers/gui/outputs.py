@@ -27,10 +27,15 @@ class RBFDRIVERS_UL_outputs(UIList):
                         emboss=False,
                         translate=False)
 
-        layout.prop(output, "mute",
-                    text="",
-                    icon=f'CHECKBOX_{"DE" if output.mute else ""}HLT',
-                    emboss=False)
+        if not output.is_valid:
+            layout.label(icon='ERROR')
+        elif not output.is_enabled:
+            layout.label(icon='RADIOBUT_OFF')
+        else:
+            layout.prop(output, "mute",
+                        text="",
+                        icon=f'CHECKBOX_{"DE" if output.mute else ""}HLT',
+                        emboss=False)
 
 
 class RBFDRIVERS_PT_outputs(GUILayerUtils, Panel):
@@ -60,10 +65,17 @@ class RBFDRIVERS_PT_outputs(GUILayerUtils, Panel):
             row.scale_y = 0.6
             row.alignment = 'RIGHT'
             row.label(text="Active:")
-            row.prop(outputs, "mute",
-                     text="",
-                     icon=f'CHECKBOX_{"DE" if outputs.mute else ""}HLT',
-                     emboss=False)
+
+            if not any(output.is_valid for output in outputs):
+                row.label(icon='ERROR')
+            elif not any(output.is_enabled for output in outputs):
+                row.label(icon='RADIOBUT_OFF')
+            else:
+                row.prop(outputs, "mute",
+                        text="",
+                        icon=f'CHECKBOX_{"DE" if outputs.mute else ""}HLT',
+                        emboss=False)
+            
             row.separator(factor=4.2)
         
         row = layout.row()
@@ -91,12 +103,17 @@ class RBFDRIVERS_PT_outputs(GUILayerUtils, Panel):
             
             column = self.split_layout(layout, "Active")
             row = column.row()
-            row.prop(output, "mute",
+
+            if not output.is_valid:
+                row.label(icon='ERROR')
+            elif not output.is_enabled:
+                row.label(icon='RADIOBUT_OFF')
+            else:
+                row.prop(output, "mute",
                      text="",
                      icon=f'CHECKBOX_{"DE" if output.mute else ""}HLT',
                      toggle=True,
-                     emboss=False,
-                     invert_checkbox=True)
+                     emboss=False)
 
             subrow = row.row()
             subrow.enabled = not output.mute
