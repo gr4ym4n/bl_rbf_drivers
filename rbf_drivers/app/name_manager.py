@@ -7,7 +7,7 @@ from ..api.input_variables import InputVariableNewEvent
 from ..api.input import InputBoneTargetUpdateEvent, InputNameUpdateEvent, InputObjectUpdateEvent
 from ..api.inputs import InputNewEvent
 from ..api.pose import PoseNameUpdateEvent
-from ..api.output import OutputNameUpdateEvent
+from ..api.output import OutputBoneTargetChangeEvent, OutputNameUpdateEvent, OutputObjectChangeEvent
 from ..api.outputs import OutputNewEvent
 from ..api.driver import DriverNameUpdateEvent
 from ..api.drivers import DriverNewEvent
@@ -198,6 +198,20 @@ def on_output_new(event: OutputNewEvent) -> None:
             event.output["name_is_user_defined"] = True
             return
     event.output["name"] = DEFAULT_OUTPUT_NAMES[event.output.type]
+
+
+@event_handler(OutputObjectChangeEvent)
+def on_output_object_update(event: OutputObjectChangeEvent) -> None:
+    output = event.output
+    if not output.name_is_user_defined and output.type != 'SINGLE_PROP':
+        output["name"] = outputname(output)
+
+
+@event_handler(OutputBoneTargetChangeEvent)
+def on_output_bone_target_update(event: OutputBoneTargetChangeEvent) -> None:
+    output = event.output
+    if not output.name_is_user_defined and output.type != 'SINGLE_PROP':
+        output["name"] = outputname(output)
 
 
 @event_handler(OutputNameUpdateEvent)
