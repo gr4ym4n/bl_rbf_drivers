@@ -2,6 +2,7 @@
 Manages ID properties for RBF driver components, with the exception of the pose weight property
 which is managed by the pose weight driver manager.
 '''
+
 from typing import TYPE_CHECKING
 from .events import event_handler
 from .utils import idprop_create, idprop_remove
