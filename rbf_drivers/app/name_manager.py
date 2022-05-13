@@ -132,8 +132,6 @@ def drivername(driver: 'RBFDriver') -> str:
         return uniqname("Driver", siblings(driver, driver.id_data.rbf_drivers))
 
 
-
-
 @event_handler(DriverNewEvent)
 def on_driver_new(event: DriverNewEvent) -> None:
     driver = event.driver
