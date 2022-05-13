@@ -51,7 +51,7 @@ A linear interpolation does not result in any adjustment of the output values. T
 
 ### Custom Curve
 
-With a custom curve you are free to define any interpolation curve you wish. After selecting the **Custom Curve** option you can use the [curve editor](#curve-editor) to add, remove and adjust control points.
+With a custom curve you are free to define any interpolation curve you wish. After selecting the **Custom Curve** option you can use the [curve editor](#curve-editor) to add, remove and adjust control points. The animation below show the effect using the curve defined [below](#curve-editor).
 
 <img src="/img/manual-interpolation-custom.gif" alt="Custom interpolation" width="100%">
 
@@ -77,4 +77,4 @@ The curve displayed in the curve editor will only be editable if you have select
 
 ## Pose Interpolation
 
-By default, each pose will use the RBF driver's interpolation settings. It is however possible to override the interpolation on a per-pose basis. For further details you can read about pose interpolation [here](/manual/poses/interpolation)
+By default, each pose will use the RBF driver's interpolation settings. It is however possible to override the interpolation on a per-pose basis. For further details you can read about pose interpolation [here](/manual/poses/interpolation).

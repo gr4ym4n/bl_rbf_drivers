@@ -7,6 +7,12 @@ position: 101
 fullscreen: true
 ---
 
+## What is RBF Drivers?
+
+Fundamentally **RBF Drivers** lets you animate any number of *output* values based on any number of *input* values. We do this by defining *poses*. Defining a pose is simply telling **RBF Drivers** that when *these* input values are like *this*, I want *those* output values to be like *that*. **RBF Drivers** does all the heavy lifting to make it happen. In contrast to setting up constraints and Blender's native drivers you dont need to define *how* something happens, just *what* happens.
+
+## What is the difference 
+
 To understand RBF drivers, it's helpful to first take a look at Blender's native drivers so that we can see how RBF drivers are different, and what makes them so powerful.
 
 ## Blender Drivers

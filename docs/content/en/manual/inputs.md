@@ -149,6 +149,72 @@ The **User-Defined** input type allows you to define what properties of Blender'
 
 ![User-Defined Input](/img/manual-inputs-user-defined.jpg)
 
+#### Type
+
+For **User-Defined** inputs there are three sub-types available in the **Type** dropdown menu: **Float**, **Angle** and **Quaternion**. RBF Drivers will treat the input values differently depending on this setting. You should use whichever value best describes the input data type.
+
+<alert type="info">
+
+If you have selected **Quaternion** as the input data type, then as long as the variables  you have defined describe a quaternion value (i.e. there are 4 variables), then you will also have the option to **Extract Swing Rotation** around a given axis. This will behave in the same way as a [swing] rotation input, but allows you to construct an arbitrary quaternion rotation yourself
+
+</alert>
+
+#### Variables
+
+If you have used Blender's native drivers then the variables section should be familiar to you as they offer almost exactly the same options.
+
+<table class="table-fixed">
+
+<tr>
+<td style="width:40%;"><img alt="Single Property Input Variable" src="/img/manual-inputs-variable-single-prop.jpg"></td>
+<td style="width:50%;">
+
+**Single Property**  
+Retrieves the value of an RBF property, specified by a data-block reference and a path string.
+
+</td>
+</tr>
+
+<tr>
+<td><img alt="Transform Input Variable" src="/img/manual-inputs-variable-transforms.jpg"></td>
+<td>
+
+**Transform Channel**  
+Retrieves the value of a Transform channel from an object or bone.
+
+</td>
+</tr>
+
+<tr>
+<td><img alt="Rotational Diffference Input Variable" src="/img/manual-inputs-variable-rotational-difference.jpg"></td>
+<td>
+
+**Rotational Difference**  
+Provides the value of the rotational difference between two objects or bones, in radians.
+
+</td>
+</tr>
+
+<tr>
+<td><img alt="Distance Input Variable" src="/img/manual-inputs-variable-distance.jpg"></td>
+<td>
+
+**Distance**  
+Provides the value of the distance between two objects or bones.
+
+</td>
+</tr>
+
+</table>
+
+<alert type="info">
+
+The number of variables you can add to a single input is limited to being 16. If you need more variables than that you can create another input and add the additional variables there. For the purposes of RBF Drivers there is no difference between 1 input with 8 variables, 2 inputs with 4 variables each, or 8 inputs that each have a single variable.
+
+</alert>
+
 ## Decomposing Inputs
+
+If you've set up an input of any type 
 
 ## Removing Inputs

@@ -9,7 +9,7 @@ fullscreen: true
 
 ## Introduction
 
-In this tutorial we'll be creating a very simple RBF driver that controls the location of one bone using the location of another bone. It won't be very useful in itself, but it will illustrate to workflow of creating RBF drivers. Once you're done, keep the blend file open or save it somewhere because we'll expand on it in the next couple of tutorials.
+In this tutorial we'll be creating a very simple RBF driver that controls the location of one bone using the location of another bone. It won't be very useful in itself, but it will illustrate the workflow of creating RBF drivers. Once you're done, keep the blend file open or save it somewhere because we'll expand on it in the next couple of tutorials.
 
 ## Setting The Scene
 

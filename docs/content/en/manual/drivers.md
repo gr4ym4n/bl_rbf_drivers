@@ -7,17 +7,23 @@ category: Manual
 fullscreen: false
 ---
 
-## Adding Drivers
+Once you have [installed](/installation) the addon, there should be an **RBF Drivers** section visible in the Object Properties panel.
 
-Once you have [installed](/installation) the addon, the RBF Drivers panel will be available under the Object Properties panel. You can add an RBF driver to any object you wish, though [we usually recommend](/manual/faq#which-object-should-i-add-an-rbf-driver-to) adding it the object that contains the *driven* properties.
+## Adding Drivers
 
 ![adding rbf drivers](/img/manual-drivers-adding-drivers-01.jpg)
 
 To add an RBF driver to an object, select the **Add** button in the RBF Drivers panel. If there aren't yet any RBF drivers for the object the button will be the only thing visible, otherwise it will be located next to the list of RBF drivers.
 
+<alert type="info">
+
+You can add an RBF driver to any object you wish, though [it is usually recommended](/manual/faq#which-object-should-i-add-an-rbf-driver-to) that you add it the object that contains the *driven* properties.
+
+</alert>
+
 ## Driver Types
 
-There are a number of different types of RBF driver available depending on what object you are adding the RBF driver to. You can add [Generic](#generic) or [Generic (Symmetrical)](#generic-symmetrical) drivers to any object, whereas [Shape Keys](#shape-keys) and [Shape Keys (Symmetrical)](#shape-keys-symmetrical) drivers can only be added to Mesh, Lattice or Curve objects.
+There are a number of different types of RBF driver available depending on what object you are adding the RBF driver to. You can add [Generic](#generic) or [Generic (Symmetrical)](#generic-symmetrical) drivers to *any* object, whereas [Shape Keys](#shape-keys) and [Shape Keys (Symmetrical)](#shape-keys-symmetrical) drivers can only be added to **Mesh**, **Lattice** or **Curve** objects, as only these objects can have shape keys.
 
 ![RBF driver types](/img/manual-drivers-driver-types-01.jpg)
 
@@ -31,7 +37,7 @@ Selecting the [symmetrical](/manual/symmetry) version of a [generic](#generic) R
 
 <alert type="info">
 
-If you've already set up an RBF driver and you want to create a symmetrical, linked copy of it, you can use the **Duplicate Mirrored** action from the specials menu at the side of the Driver's list. The action will be available as long as the RBF driver is named according to [Blender's naming conventions for mirroring](https://docs.blender.org/manual/en/latest/animation/armatures/bones/editing/naming.html#naming-conventions) (e.g. "RBFDriver.L")
+If you've already set up an RBF driver and you want to create a symmetrical, linked copy of it, you can use the [**duplicate mirrored**](#duplicate-mirrored) action from the [driver actions menu](#driver-actions-menu) at the side of the Driver's list. The action will be available as long as the RBF driver is named according to [Blender's naming conventions for mirroring](https://docs.blender.org/manual/en/latest/animation/armatures/bones/editing/naming.html#naming-conventions) (e.g. "RBFDriver.L")
 
 </alert>
 
