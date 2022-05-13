@@ -22,6 +22,13 @@ class RBFDriverPreferences(AddonPreferences):
         options=set()
         )
 
+    debug: BoolProperty(
+        name="Debug",
+        description="Keep debugging logs",
+        default=False,
+        options=set()
+        )
+
     def draw(self, _: 'Context') -> None:
         layout = self.layout
         layout.prop(self, "license_key", text="License Key")
