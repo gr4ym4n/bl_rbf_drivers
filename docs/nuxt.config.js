@@ -2,6 +2,10 @@
 import theme from '@nuxt/content-theme-docs'
 
 export default theme({
+    target: 'static',
+    router: {
+        base: '/bl_rbf_drivers/'
+    },
     docs: {
         primaryColor: '#8b3577'
     },
