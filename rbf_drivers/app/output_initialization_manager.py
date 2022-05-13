@@ -26,6 +26,7 @@ def output_init__rotation(output: 'RBFDriverOutput', pose_count: int) -> None:
         channel["array_index"] = index
         channel["data_path"] = "rotation_quaternion"
         channel["default_value"] = float(index == 0)
+        channel["is_enabled"] = True
         channel.data.__init__([channel.default_value] * pose_count)
 
 

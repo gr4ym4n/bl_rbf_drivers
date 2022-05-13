@@ -4,14 +4,18 @@ Note that output channel data initialization is handled by the output inititiali
 
 from itertools import chain
 from operator import attrgetter
-from typing import TYPE_CHECKING, Iterable, Iterator, Optional, Tuple
+from typing import TYPE_CHECKING, Iterable, Iterator, Tuple, Union
 from functools import partial
 import numpy as np
-from .events import event_handler
+from .events import dispatch_event, event_handler
 from .utils import owner_resolve
 from ..api.pose import PoseUpdateEvent
 from ..api.poses import PoseMoveEvent, PoseNewEvent, PoseRemovedEvent
-from ..api.output import OutputRotationModeChangeEvent
+from ..api.output import (OUTPUT_ROTATION_MODE_TABLE,
+                          OutputBoneTargetChangeEvent,
+                          OutputObjectChangeEvent,
+                          OutputRotationModeChangeEvent,
+                          output_rotation_mode)
 from ..api.drivers import DriverNewEvent
 from ..lib.rotation_utils import (axis_angle_to_euler,
                                   axis_angle_to_quaternion,
@@ -83,6 +87,32 @@ def on_output_rotation_mode_change(event: OutputRotationModeChangeEvent) -> None
 
         for channel, values in zip(output.channels, matrix):
             channel.data.__init__(values)
+
+
+@event_handler(OutputBoneTargetChangeEvent, OutputObjectChangeEvent)
+def on_output_bone_target_change_event(event: Union[OutputBoneTargetChangeEvent, OutputObjectChangeEvent]) -> None:
+    output = event.output
+
+    if output.type == 'ROTATION' and not output.rotation_mode_is_user_defined:
+        target = output.object
+
+        if (target is not None
+            and target.type == 'ARMATURE'
+            and output.bone_target
+            ):
+            target = target.pose.bones.get(output.bone_target)
+
+        if target is not None:
+            mode = target.rotation_mode
+            if len(mode) < 5:
+                mode = 'EULER'
+
+            if output.rotation_mode != mode:
+                # Manually set property and dispatch event to avoid
+                # rotation_mode_is_user_defined flag being set
+                prev = output_rotation_mode(output)
+                output["rotation_mode"] = OUTPUT_ROTATION_MODE_TABLE[mode]
+                dispatch_event(OutputRotationModeChangeEvent(output, mode, prev))
 
 
 @event_handler(PoseNewEvent)

@@ -7,6 +7,7 @@ from ..api.input_variables import InputVariableNewEvent
 from ..api.input import InputBoneTargetUpdateEvent, InputNameUpdateEvent, InputObjectUpdateEvent
 from ..api.inputs import InputNewEvent
 from ..api.pose import PoseNameUpdateEvent
+from ..api.output_channel import OutputChannelNameChangeEvent
 from ..api.output import OutputBoneTargetChangeEvent, OutputNameUpdateEvent, OutputObjectChangeEvent
 from ..api.outputs import OutputNewEvent
 from ..api.driver import DriverNameUpdateEvent
@@ -96,8 +97,16 @@ def outputname(output: 'RBFDriverOutput') -> str:
             suffix = target if target and object and object.type == "ARMATURE" else object.name
             result = f'{result} ({suffix})'
 
+    elif type == 'SHAPE_KEY':
+        result = output.channels[0].name or "Shape Key"
+        driver: 'RBFDriver' = owner_resolve(output, ".outputs")
+        if driver.type !=  'SHAPE_KEY':
+            object = output.object
+            if object:
+                result = f'{result} ({object.name})'
+
     else:
-        result = "Shape Key" if type == 'SHAPE_KEY' else "Property"
+        result = "Property"
         object = output.object
         if object:
             result = f'{result} ({object.name})'
@@ -114,19 +123,23 @@ def drivername(driver: 'RBFDriver') -> str:
 
 @event_handler(DriverNewEvent)
 def on_driver_new(event: DriverNewEvent) -> None:
-    if not event.driver.name:
-        event.driver["name"] = drivername(event.driver)
+    driver = event.driver
+    if not driver.name:
+        driver["name"] = drivername(event.driver)
 
 
 @event_handler(DriverNameUpdateEvent)
 def on_driver_name_update(event: DriverNameUpdateEvent) -> None:
     if not event.value:
-        event.driver["name"] = drivername(event.driver)
+        driver = event.driver
+        driver["name"] = drivername(driver)
 
 
 @event_handler(InputNewEvent)
 def on_input_new(event: InputNewEvent) -> None:
-    type = event.input.type
+    input = event.input
+    type = input.type
+
     if type == 'USER_DEF':
         driver: 'RBFDriver' = owner_resolve(event.input, ".inputs")
         event.input["name"] = uniqname("Input", [x.name for x in driver.inputs if x != input])
@@ -219,12 +232,15 @@ def on_output_name_update(event: OutputNameUpdateEvent) -> None:
     output = event.output
     driver: 'RBFDriver' = owner_resolve(output, ".outputs")
 
-    if driver.type == 'SHAPE_KEY':
-        # Use dot notation to trigger OutputChannelNameChangeEvent
-        output.channels[0].name = event.value
-    elif event.value:
+    if event.value:
         output["name_is_user_defined"] = True
         output["name"] = uniqname(event.value, [x.name for x in driver.outputs if x != output])
     else:
         output["name_is_user_defined"] = False
+        output["name"] = outputname(output)
+
+@event_handler(OutputChannelNameChangeEvent)
+def on_output_channel_name_change(event: OutputChannelNameChangeEvent) -> None:
+    output: 'RBFDriverOutput' = owner_resolve(event.channel, ".channels")
+    if output.type == 'SHAPE_KEY' and not output.name_is_user_defined:
         output["name"] = outputname(output)

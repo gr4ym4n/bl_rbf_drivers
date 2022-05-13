@@ -31,7 +31,7 @@ class OutputMoveEvent(Event):
 
 
 def outputs_mute(outputs: 'RBFDriverOutputs') -> bool:
-    return any(map(output_mute, outputs))
+    return all(map(output_mute, outputs))
 
 
 def outputs_mute_set(outputs: 'RBFDriverOutputs', value: bool) -> None:

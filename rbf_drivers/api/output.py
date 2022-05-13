@@ -201,7 +201,7 @@ def output_name_update_handler(output: 'RBFDriverOutput', _: 'Context') -> None:
 
 
 def output_name_is_user_defined(output: 'RBFDriverOutput') -> bool:
-    return output.get("name_is_user_defined")
+    return output.get("name_is_user_defined", False)
 
 
 def output_object_update_handler(output: 'RBFDriverOutput', _: 'Context') -> None:

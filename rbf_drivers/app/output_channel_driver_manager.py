@@ -561,9 +561,8 @@ def output_logmap_matrix(output: 'RBFDriverOutput') -> np.ndarray:
 @event_handler(OutputChannelNameChangeEvent)
 def on_output_channel_name_change(event: OutputChannelNameChangeEvent) -> None:
     channel = event.channel
-    driver: 'RBFDriver' = owner_resolve(channel, ".outputs")
-    if driver.type == 'SHAPE_KEY':
-        output: 'RBFDriverOutput' = owner_resolve(channel, ".channels")
+    output: 'RBFDriverOutput' = owner_resolve(channel, ".channels")
+    if output.type == 'SHAPE_KEY':
         output_deactivate(output)
         output_assign_channel_data_targets(output)
         if output.is_valid:
