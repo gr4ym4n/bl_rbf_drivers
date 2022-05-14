@@ -15,6 +15,13 @@ class RBFDriverPreferences(AddonPreferences):
         options=set(),
         )
 
+    include_beta_versions: BoolProperty(
+        name="Include Beta Versions",
+        description="Download and install beta versions",
+        default=False,
+        options=set()
+        )
+
     license_key: StringProperty(
         name="License Key",
         description="License key for use with auto-update",

@@ -107,7 +107,8 @@ class RBFDRIVERS_OT_check_for_update(Operator):
             "product": "rbf_drivers",
             "license": prefs.license_key,
             "version": ".".join(map(str, version)),
-            "blender": ".".join(map(str, bpy.app.version))
+            "blender": ".".join(map(str, bpy.app.version)),
+            "beta": prefs.include_beta_versions
             }
 
         url = ""
