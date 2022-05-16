@@ -7,7 +7,9 @@
     "dev": "nuxt",
     "build": "nuxt build",
     "start": "nuxt start",
-    "generate": "nuxt generate"
+    "generate": "nuxt generate",
+    "predeploy": "nuxt generate",
+    "deploy": "gh-pages -d dist"
   },
   "author": "",
   "license": "ISC",
@@ -18,5 +20,8 @@
     "puppeteer": "^13.5.1",
     "remark-mermaid": "^0.2.0",
     "remark-mermaidjs": "^2.1.1"
+  },
+  "devDependencies": {
+    "gh-pages": "^4.0.0"
   }
 }

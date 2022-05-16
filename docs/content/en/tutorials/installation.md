@@ -17,4 +17,4 @@ You're now ready to go, but it is strongly recommended to at least go through th
 
 ## License Key / Auto Update
 
-Like all Blender addons, RBF Drivers is released under a permissive open source GPL license. However, if you have supported development by purchasing the addon we provide extra [support](/support) and services. You should receive a license key from us that you can copy/paste into the **License Key** field in the addon's preferences to enable the auto-update feature.
+Like all Blender addons, RBF Drivers is released under a permissive open source GPL license. However, if you have supported development by purchasing the addon we provide extra [support](/manual/support) and services. You should receive a license key from us that you can copy/paste into the **License Key** field in the addon's preferences to enable the auto-update feature.

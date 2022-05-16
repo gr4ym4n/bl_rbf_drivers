@@ -7,7 +7,7 @@ category: Manual
 fullscreen: false
 ---
 
-Once you have [installed](/installation) the addon, there should be an **RBF Drivers** section visible in the Object Properties panel.
+Once you have [installed](/tutorials/installation) the addon, there should be an **RBF Drivers** section visible in the Object Properties panel.
 
 ## Adding Drivers
 
@@ -33,7 +33,7 @@ Generic RBF drivers allow the most flexibility. There are no restrictions to the
 
 ### Generic (Symmetrical)
 
-Selecting the [symmetrical](/manual/symmetry) version of a [generic](#generic) RBF driver will actually create 2 linked RBF drivers, one for each of the left and right sides. This is useful where you have a mirrored rig because you can set up the driver for one side and the addon will mirror your [inputs](/manual/inputs), [outputs](/manaul/outputs) and [poses](/manual/poses) to the other side as you make changes.
+Selecting the [symmetrical](/manual/symmetry) version of a [generic](#generic) RBF driver will actually create 2 linked RBF drivers, one for each of the left and right sides. This is useful where you have a mirrored rig because you can set up the driver for one side and the addon will mirror your [inputs](/manual/inputs), [outputs](/manual/outputs) and [poses](/manual/poses) to the other side as you make changes.
 
 <alert type="info">
 

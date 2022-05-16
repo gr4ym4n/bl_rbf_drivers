@@ -17,7 +17,7 @@ In many situations, you will have an RBF driver with inputs coming from one data
 
 #### I think RBF Drivers is causing a circular dependency. What can I do?
 
-Blender's [dependency graph](https://wiki.blender.org/wiki/Source/Depsgraph) went through some much needed improvements back in version 2.8, but circular dependencies are nevertheless still very much possible. RBF drivers are carefully designed not to produce circular dependencies as long as the normal rules governing Blender's dependency graph are adhered to, but it doesn't prevent you from creating them. If you create an RBF driver that uses the location of an object to drive itself, then obviously you've created a circular dependency. If you're sure that it's the RBF driver itself that's causing the problem then [file an bug report](/support), but please take a little time to verify your setup before you do.
+Blender's [dependency graph](https://wiki.blender.org/wiki/Source/Depsgraph) went through some much needed improvements back in version 2.8, but circular dependencies are nevertheless still very much possible. RBF drivers are carefully designed not to produce circular dependencies as long as the normal rules governing Blender's dependency graph are adhered to, but it doesn't prevent you from creating them. If you create an RBF driver that uses the location of an object to drive itself, then obviously you've created a circular dependency. If you're sure that it's the RBF driver itself that's causing the problem then [file an bug report](/manual/support), but please take a little time to verify your setup before you do.
 
 #### What are the extra custom properties RBF Drivers is creating?
 
@@ -39,4 +39,4 @@ No. RBF drivers use Blender's native drivers to drive the driven properties, and
 
 RBF Drivers - as with all Blender addons - is realeased under an open source GPL license. However, if you purchased the addon through any of our sales channels then we provide some extra support and services as a way of expressing our gratitude for supporting development.
 
-You should have received a license key either with the sales receipt or shortly afterwards by email. If you haven't received a license key within 48 hours of your purchase please [get in touch](/support).
+You should have received a license key either with the sales receipt or shortly afterwards by email. If you haven't received a license key within 48 hours of your purchase please [get in touch](/manual/support).

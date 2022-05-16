@@ -25,7 +25,7 @@ You should now have a scene that looks something like the image below.
 
 ## Setting Up The RBF Driver
 
-As long as you have the addon [installed](/installation), you should be able to find the RBF Drivers pane of the **Object Properties** panel. At the moment we haven't got any RBF drivers for this object so the only thing you will see is an **Add** button.
+As long as you have the addon [installed](/tutorials/installation), you should be able to find the RBF Drivers pane of the **Object Properties** panel. At the moment we haven't got any RBF drivers for this object so the only thing you will see is an **Add** button.
 
 To add a new RBF driver click the **Add** button and select *Generic* from the popup menu (we'll explain what the other options are in later tutorials). The RBF Drivers pane will now show the list of drivers with the one we just added selected at the top, and its various settings (**Interpolation**, **Inputs**, etc.) below. For the moment we'll ignore the **Interpolation** and skip to **Inputs**.
 

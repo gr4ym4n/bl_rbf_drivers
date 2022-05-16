@@ -77,4 +77,4 @@ The curve displayed in the curve editor will only be editable if you have select
 
 ## Pose Interpolation
 
-By default, each pose will use the RBF driver's interpolation settings. It is however possible to override the interpolation on a per-pose basis. For further details you can read about pose interpolation [here](/manual/poses/interpolation).
+By default, each pose will use the RBF driver's interpolation settings. It is however possible to override the interpolation on a per-pose basis. For further details you can read about pose interpolation [here](/manual/poses#interpolation).
