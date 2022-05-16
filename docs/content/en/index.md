@@ -6,7 +6,7 @@ position: 1
 fullscreen: true
 ---
 
-<img class="ml-auto mr-auto pb-8" width="80%" src="/svg/rbf-drivers-logo.svg" onerror="this.src='/img/rbf-drivers-logo.png'">
+<img class="ml-auto mr-auto pb-8" width="80%" src="/bl_rbf_drivers/svg/rbf-drivers-logo.svg" onerror="this.src='/bl_rbf_drivers/img/rbf-drivers-logo.png'">
 
 RBF Drivers brings the power and expressivity of radial basis function networks to Blender, enabling complex rigging and animation that would otherwise be difficult or even impossible with Blender's native tools.
 

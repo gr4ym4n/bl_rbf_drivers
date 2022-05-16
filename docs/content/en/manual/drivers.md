@@ -11,7 +11,7 @@ Once you have [installed](/tutorials/installation) the addon, there should be an
 
 ## Adding Drivers
 
-![adding rbf drivers](/img/manual-drivers-adding-drivers-01.jpg)
+![adding rbf drivers](/bl_rbf_drivers/img/manual-drivers-adding-drivers-01.jpg)
 
 To add an RBF driver to an object, select the **Add** button in the RBF Drivers panel. If there aren't yet any RBF drivers for the object the button will be the only thing visible, otherwise it will be located next to the list of RBF drivers.
 
@@ -25,7 +25,7 @@ You can add an RBF driver to any object you wish, though [it is usually recommen
 
 There are a number of different types of RBF driver available depending on what object you are adding the RBF driver to. You can add [Generic](#generic) or [Generic (Symmetrical)](#generic-symmetrical) drivers to *any* object, whereas [Shape Keys](#shape-keys) and [Shape Keys (Symmetrical)](#shape-keys-symmetrical) drivers can only be added to **Mesh**, **Lattice** or **Curve** objects, as only these objects can have shape keys.
 
-![RBF driver types](/img/manual-drivers-driver-types-01.jpg)
+![RBF driver types](/bl_rbf_drivers/img/manual-drivers-driver-types-01.jpg)
 
 ### Generic
 
@@ -65,7 +65,7 @@ The symmetrical version of the **Shape Keys** RBF driver works in much the same 
 
 ## Driver Actions Menu
 
-![driver actions menu](/img/manual-drivers-action-menu.jpg)
+![driver actions menu](/bl_rbf_drivers/img/manual-drivers-action-menu.jpg)
 
 Additional actions for the currently selected RBF driver are available in the dropdown menu to the right of the list of drivers.
 
@@ -97,6 +97,6 @@ Though you can undo the action to reverse the changes, there is no action within
 
 ## Removing Drivers
 
-![remove-driver](/img/manual-drivers-remove-driver.jpg)
+![remove-driver](/bl_rbf_drivers/img/manual-drivers-remove-driver.jpg)
 
 To remove an RBF driver simply click the **-** button next to the list of drivers. The data properties related to the RBF driver and the drivers it is managing internally will be removed along with the RBF driver itself.

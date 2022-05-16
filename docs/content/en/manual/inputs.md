@@ -9,7 +9,7 @@ fullscreen: false
 
 ## Adding Inputs
 
-![Add Input](/img/manual-inputs-add-input.jpg)
+![Add Input](/bl_rbf_drivers/img/manual-inputs-add-input.jpg)
 
 To add an input, click the **+** button next to the list of inputs. You can then select the type of input you want to add.
 
@@ -27,7 +27,7 @@ There are a number of different input types tailored to particular needs, as wel
 
 The **Location** input type reads the translation values of an object or pose bone.
 
-![Location Input](/img/manual-inputs-location.jpg)
+![Location Input](/bl_rbf_drivers/img/manual-inputs-location.jpg)
 
 #### Target
 
@@ -49,7 +49,7 @@ The **Channels** settings allow you to select which transform channels you want 
 
 The **Rotation** input type reads the rotation values of an object or pose bone.
 
-![Rotation Input](/img/manual-inputs-rotation.jpg)
+![Rotation Input](/bl_rbf_drivers/img/manual-inputs-rotation.jpg)
 
 #### Target
 
@@ -99,7 +99,7 @@ The various coordinate spaces used within Blender can be the cause of some confu
 
 The **Scale** input type reads the scale values of an object or pose bone.
 
-![Scale Input](/img/manual-inputs-scale.jpg)
+![Scale Input](/bl_rbf_drivers/img/manual-inputs-scale.jpg)
 
 #### Target
 
@@ -115,7 +115,7 @@ The various coordinate spaces used within Blender can be the cause of some confu
 
 The **Rotational Difference** input type reads the angle between two objects of pose bones.
 
-![Rotational Difference Input](/img/manual-inputs-rotational-difference.jpg)
+![Rotational Difference Input](/bl_rbf_drivers/img/manual-inputs-rotational-difference.jpg)
 
 #### Targets
 
@@ -125,7 +125,7 @@ You can select any object as a rotational difference input target. Selecting an 
 
 The **Distance** input type reads the distance between two objects or pose bones
 
-![Distance Input](/img/manual-inputs-distance.jpg)
+![Distance Input](/bl_rbf_drivers/img/manual-inputs-distance.jpg)
 
 #### Targets
 
@@ -141,13 +141,13 @@ The various coordinate spaces used within Blender can be the cause of some confu
 
 The **Shape Keys** input type reads the values of one or more shape keys.
 
-![Shape Keys Input](/img/manual-inputs-shape-key.jpg)
+![Shape Keys Input](/bl_rbf_drivers/img/manual-inputs-shape-key.jpg)
 
 ### User-Defined
 
 The **User-Defined** input type allows you to define what properties of Blender's data blocks to read, and how the RBF driver should treat those properties.
 
-![User-Defined Input](/img/manual-inputs-user-defined.jpg)
+![User-Defined Input](/bl_rbf_drivers/img/manual-inputs-user-defined.jpg)
 
 #### Type
 
@@ -166,7 +166,7 @@ If you have used Blender's native drivers then the variables section should be f
 <table class="table-fixed">
 
 <tr>
-<td style="width:40%;"><img alt="Single Property Input Variable" src="/img/manual-inputs-variable-single-prop.jpg"></td>
+<td style="width:40%;"><img alt="Single Property Input Variable" src="/bl_rbf_drivers/img/manual-inputs-variable-single-prop.jpg"></td>
 <td style="width:50%;">
 
 **Single Property**  
@@ -176,7 +176,7 @@ Retrieves the value of an RBF property, specified by a data-block reference and 
 </tr>
 
 <tr>
-<td><img alt="Transform Input Variable" src="/img/manual-inputs-variable-transforms.jpg"></td>
+<td><img alt="Transform Input Variable" src="/bl_rbf_drivers/img/manual-inputs-variable-transforms.jpg"></td>
 <td>
 
 **Transform Channel**  
@@ -186,7 +186,7 @@ Retrieves the value of a Transform channel from an object or bone.
 </tr>
 
 <tr>
-<td><img alt="Rotational Diffference Input Variable" src="/img/manual-inputs-variable-rotational-difference.jpg"></td>
+<td><img alt="Rotational Diffference Input Variable" src="/bl_rbf_drivers/img/manual-inputs-variable-rotational-difference.jpg"></td>
 <td>
 
 **Rotational Difference**  
@@ -196,7 +196,7 @@ Provides the value of the rotational difference between two objects or bones, in
 </tr>
 
 <tr>
-<td><img alt="Distance Input Variable" src="/img/manual-inputs-variable-distance.jpg"></td>
+<td><img alt="Distance Input Variable" src="/bl_rbf_drivers/img/manual-inputs-variable-distance.jpg"></td>
 <td>
 
 **Distance**  
