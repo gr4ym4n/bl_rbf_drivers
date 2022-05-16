@@ -102,7 +102,10 @@ from .ops.driver import (RBFDRIVERS_OT_new,
                          LegacyDriver,
                          RBFDRIVERS_OT_upgrade)
 
-from .ops.addon import RBFDRIVERS_OT_check_for_update, RBFDRIVERS_OT_update
+from .ops.addon import (RBFDRIVERS_OT_addon_reset_update_status,
+                        RBFDRIVERS_OT_addon_install_update,
+                        RBFDRIVERS_OT_check_for_update,
+                        RBFDRIVERS_OT_addon_download_update)
 
 from .gui.generic import RBFDRIVERS_UL_selection_list
 from .gui.drivers import (RBFDRIVERS_UL_drivers,
@@ -175,8 +178,10 @@ def classes():
         RBFDRIVERS_OT_move_down,
         LegacyDriver,
         RBFDRIVERS_OT_upgrade,
+        RBFDRIVERS_OT_addon_reset_update_status,
+        RBFDRIVERS_OT_addon_install_update,
         RBFDRIVERS_OT_check_for_update,
-        RBFDRIVERS_OT_update,
+        RBFDRIVERS_OT_addon_download_update,
         # gui
         RBFDRIVERS_UL_selection_list,
         RBFDRIVERS_UL_drivers,

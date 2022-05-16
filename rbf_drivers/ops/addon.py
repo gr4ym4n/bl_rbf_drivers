@@ -1,13 +1,94 @@
 
-from json import JSONDecodeError
 from typing import Set, TYPE_CHECKING
 import logging
 from bpy.types import Operator
 from bpy.props import StringProperty
+from ..app.utils import update_filepath_check, update_script_read, update_preferences
 if TYPE_CHECKING:
     from bpy.types import Context, Event
 
 log = logging.getLogger()
+
+
+class RBFDRIVERS_OT_addon_reset_update_status(Operator):
+    bl_idname = "rbf_driver.addon_reset_update_status"
+    bl_label = "OK"
+    bl_description = "Acknowledge"
+    bl_options = {'INTERNAL', 'UNDO'}
+
+    def execute(self, context: 'Context') -> Set[str]:
+        prefs = context.preferences.addons["rbf_drivers"].preferences
+        prefs.new_release_version = ""
+        prefs.new_release_url = ""
+        prefs.new_release_date = ""
+        prefs.new_release_path = ""
+        prefs.new_release_is_stable = False
+        prefs.update_error = ""
+        prefs.update_status = 'NONE'
+        return {'FINISHED'}
+
+
+class RBFDRIVERS_OT_addon_install_update(Operator):
+    bl_idname = "rbf_driver.addon_install_update"
+    bl_label = "Install"
+    bl_description = "Install the update"
+    bl_options = {'INTERNAL', 'UNDO'}
+
+    @classmethod
+    def poll(cls, context: 'Context') -> bool:
+        prefs = context.preferences.addons["rbf_drivers"].preferences
+        return prefs.update_status == 'READY'
+
+    def execute(self, context: 'Context') -> Set[str]:
+        import bpy
+
+        log.debug("Installing update.")
+
+        # TODO Zip and cache current installation
+        
+        prefs = context.preferences.addons["rbf_drivers"].preferences
+        filepath = prefs.new_release_path
+
+        def cancel_with_error(error: Exception) -> Set[str]:
+            prefs.update_status = 'ERROR'
+            prefs.update_error = str(error)
+            self.report({'ERROR'}, str(error))
+            return {'CANCELLED'}
+
+        log.debug(f'Checking update file path: "{filepath}"')
+
+        error = update_filepath_check(filepath)
+        if error:
+            return cancel_with_error(error)
+        else:
+            log.info("Update file path checked OK.")
+
+        log.debug("Creating update script.")
+
+        text = bpy.data.texts.get("rbf_drivers_update_script")
+        if text:
+            text.clear()
+        else:
+            text = bpy.data.texts.new("rbf_drivers_update_script")
+
+        try:
+            data = update_script_read(filepath)
+        except Exception as error:
+            return cancel_with_error(error)
+        else:
+            text.write(data)
+
+        log.debug("Running update script.")
+
+        try:
+            context = context.copy()
+            context['edit_text'] = text
+            bpy.ops.text.run_script(context)
+        except Exception as error:
+            return cancel_with_error(error)
+
+        return {'FINISHED'}
+
 
 class RBFDRIVERS_OT_check_for_update(Operator):
     bl_idname = "rbf_driver.check_for_update"
@@ -21,12 +102,20 @@ class RBFDRIVERS_OT_check_for_update(Operator):
 
     @classmethod
     def poll(cls, context: 'Context') -> bool:
-        return bool(context.preferences.addons["rbf_drivers"].preferences.license_key)
+        prefs = context.preferences.addons["rbf_drivers"].preferences
+        return bool(prefs.license_key)
 
     def modal(self, context: 'Context', event: 'Event') -> Set[str]:
 
         if event.type != 'TIMER':
             return {'PASS_THROUGH'}
+
+        prefs = context.preferences.addons["rbf_drivers"].preferences
+        prefs.update_progress = self._timer.time_duration
+
+        area = context.area
+        if area:
+            area.tag_redraw()
 
         result = self._result
 
@@ -39,69 +128,46 @@ class RBFDRIVERS_OT_check_for_update(Operator):
         self.cancel(context)
 
         if isinstance(result, Exception):
-            log.error(str(result))
-
-            def draw(self, _):
-                column = self.layout.column()
-                column.separator()
-                column.label(text="An error occured while checking for updates.")
-                column.label(text="See console for details.")
-                column.separator()
-
-            context.window_manager.popup_menu(draw, title="Update Check Failed", icon='ERROR')
+            update_preferences(prefs, 'ERROR', update_error=str(result))
             return {'CANCELLED'}
 
-        url = result.get("url", "")
+        url = result.get("url")
 
-        if url and result.get("update", False):
-            def draw(self, _):
-                column = self.layout.column()
-                column.separator()
-                version = result.get("version", "")
-                if version:
-                    column.label(text=f'RBF Drivers {version} is available')
-                column.operator(RBFDRIVERS_OT_update.bl_idname,
-                                text="Download and Install",
-                                depress=RBFDRIVERS_OT_update._running).url = url
-                column.separator()
-            context.window_manager.popup_menu(draw, title="Update Available", icon='PLUGIN')
-        else:
-            def draw(self, _):
-                column = self.layout.column()
-                column.separator()
-                column.label(text="You currently have the latest version of RBF Drivers installed")
-                column.separator()
-            context.window_manager.popup_menu(draw, title="No Update Available", icon='PLUGIN')
+        if not isinstance(url, str) or not url:
+            update_preferences(prefs, 'NO_UPDATE')
+            return {'CANCELLED'}
 
+        update_preferences(prefs, 'AVAILABLE',
+                           new_release_url=url,
+                           new_release_version=result.get("version"),
+                           new_release_date=result.get("release_date"),
+                           new_release_is_stable=(result.get("stable", False) in (True, 'true')))
         return {'FINISHED'}
 
     def execute(self, context: 'Context') -> Set[str]:
-        import bpy, threading, urllib, addon_utils
+        import bpy, addon_utils, threading, urllib
 
-        name = "RBF Drivers"
-        info = next((m.bl_info for m in addon_utils.modules() if m.bl_info.get("name") == name), None)
-        if not info:
-            self.report({'ERROR'}, "Failed to read bl_info")
+        prefs = context.preferences.addons["rbf_drivers"].preferences
+
+        def cancel_with_error(error):
+            update_preferences(prefs, 'ERROR', str(error))
+            self.report({'ERROR'}, str(error))
             return {'CANCELLED'}
 
-        version = info.get("version")
+        defn = next((m for m in addon_utils.modules() if m.__name__ == "rbf_drivers"), None)
+        if not defn:
+            return cancel_with_error("Unable to find module data file")
 
+        bl_info = defn.bl_info
+        version = bl_info.get("version")
         if version is None:
-            self.report({'ERROR'}, "bl_info.version not found")
-            return {'CANCELLED'}
+            return cancel_with_error("bl_info.version not found")
 
-        if (not isinstance(version, tuple)
+        if (not isinstance(version, (tuple, list))
             or len(version) != 3
             or not all(isinstance(value, int) for value in version)
             ):
-            self.report({'ERROR'}, "bl_info version is not valid")
-            return {'CANCELLED'}
-
-        try:
-            prefs = context.preferences.addons["rbf_drivers"].preferences
-        except KeyError:
-            self.report({'ERROR'}, "Failed to read preferences.")
-            return {'CANCELLED'}
+            return cancel_with_error("bl_info version is not valid")
 
         params = {
             "product": "rbf_drivers",
@@ -115,13 +181,17 @@ class RBFDRIVERS_OT_check_for_update(Operator):
         try:
             from ..app.config import update_url
         except:
-            self.report({'ERROR'}, 'Unable to read update server URL')
-            return {'CANCELLED'}
+            return cancel_with_error('Unable to read update server URL')
         else:
             url = f'{update_url}?{urllib.parse.urlencode(params)}'
 
+        log.debug((f'Checking if update is available. '
+                   f'Current version is {params["version"]}'))
+
         def send_request(self, url: str) -> None:
-            import urllib, json
+            import json
+            import urllib
+            import urllib.request
             try:
                 with urllib.request.urlopen(url) as response:
                     if str(response.code) == "200":
@@ -130,6 +200,12 @@ class RBFDRIVERS_OT_check_for_update(Operator):
                         self._result = RuntimeError(str(response))
             except Exception as error:
                 self._result = error
+
+        update_preferences(prefs, 'CHECKING', update_progress=0.0)
+
+        area = context.area
+        if area:
+            area.tag_redraw()
 
         self._timer = context.window_manager.event_timer_add(0.2, window=context.window)
         self._result = None
@@ -143,11 +219,14 @@ class RBFDRIVERS_OT_check_for_update(Operator):
         context.window_manager.event_timer_remove(self._timer)
         self._timer = None
 
+        prefs = context.preferences.addons["rbf_drivers"].preferences
+        prefs.update_progress = 0.0
 
-class RBFDRIVERS_OT_update(Operator):
-    bl_idname = "rbf_driver.addon_update"
-    bl_label = "Update"
-    bl_description = "Update to latest version"
+
+class RBFDRIVERS_OT_addon_download_update(Operator):
+    bl_idname = "rbf_driver.addon_download_update"
+    bl_label = "Download"
+    bl_description = "Download update"
     bl_options = {'INTERNAL', 'UNDO'}
     _thread = None
     _timer = None
@@ -157,44 +236,48 @@ class RBFDRIVERS_OT_update(Operator):
 
     @classmethod
     def poll(cls, context: 'Context') -> bool:
-        return bool(context.preferences.addons["rbf_drivers"].preferences.license_key)
+        prefs = context.preferences.addons["rbf_drivers"].preferences
+        return prefs.update_status == 'AVAILABLE'
 
     def modal(self, context: 'Context', event: 'Event') -> Set[str]:
         if event.type != 'TIMER':
             return {'PASS_THROUGH'}
 
+        prefs = context.preferences.addons["rbf_drivers"].preferences
+        prefs.update_progress = self._timer.time_duration
+
+        area = context.area
+        if area:
+            area.tag_redraw()
+
         error = self._error
         if error is not None:
-            log.error(str(error))
             self.cancel(context)
-            def draw(self, _: 'Context') -> None:
-                layout = self.layout
-                layout.separator()
-                layout.label(text="An error occured while dowloading the update.")
-                layout.label(text="See console for details.")
-                layout.separator()
-            context.window_manager.popup_menu(draw, title="Update Failed", icon='ERROR')
+            update_preferences(prefs, 'ERROR', str(error))
+            self.report({'ERROR'}, str(error))
             return {'CANCELLED'}
 
-        filename = self._filename
-        if filename:
-            import bpy
+        path = self._filename
+        if path:
             self.cancel(context)
-            bpy.ops.preferences.addon_disable(module="rbf_drivers")
-            bpy.ops.preferences.addon_remove(module="rbf_drivers")
-            bpy.ops.preferences.addon_install(filepath=filename)
-            bpy.ops.preferences.addon_enable(module="rbf_drivers")
+            update_preferences(prefs, 'READY', new_release_path=path)
             return {'FINISHED'}
 
         return {'PASS_THROUGH'}
 
     def execute(self, context: 'Context') -> Set[str]:
         import threading
-        
-        url = self.url
+
+        prefs = context.preferences.addons["rbf_drivers"].preferences
+
+        url = prefs.new_release_url
         if not url:
-            self.report({'ERROR'}, "Required parameter URL not found")
+            message = "Required URL not found"
+            update_preferences(prefs, 'ERROR', update_error=message)
+            self.report({'ERROR'}, message)
             return {'CANCELLED'}
+
+        log.debug(f'Requesting download for update')
 
         def download_file(self, url: str) -> None:
             import urllib
@@ -204,6 +287,8 @@ class RBFDRIVERS_OT_update(Operator):
                 self._error = error
             else:
                 self._filename = filename
+
+        update_preferences(prefs, 'DOWNLOADING', update_progress=0.0)
 
         self._timer = context.window_manager.event_timer_add(0.2, window=context.window)
         self._error = None
@@ -217,3 +302,6 @@ class RBFDRIVERS_OT_update(Operator):
     def cancel(self, context: 'Context') -> None:
         context.window_manager.event_timer_remove(self._timer)
         self._timer = None
+
+        prefs = context.preferences.addons["rbf_drivers"].preferences
+        prefs.update_progress = 0.0

@@ -1,11 +1,13 @@
 
 from typing import Any, Dict, Optional, TYPE_CHECKING, Union
 from bpy.types import PoseBone, PropertyGroup
-from rbf_drivers.lib.driver_utils import driver_remove
 from rna_prop_ui import rna_idprop_ui_create
 from idprop.types import IDPropertyArray
+from ..lib.driver_utils import driver_remove
 if TYPE_CHECKING:
     from bpy.types import ChannelDriverVariables, ID
+    from ..api.preferences import RBFDriverPreferences
+
 
 def owner_resolve(data: PropertyGroup, token: str) -> PropertyGroup:
     path: str = data.path_from_id()
@@ -75,3 +77,27 @@ def idprop_splice(id: 'ID', name: str, index: int, remove_driver: Optional[bool]
                     if fcurve.data_path == datapath and fcurve.array_index == index:
                         animdata.drivers.remove(fcurve)
                         break
+
+
+def update_filepath_check(filepath: str) -> Optional[Exception]:
+    import os
+    if not os.path.exists(filepath):
+        return ValueError("Invalid update file path")
+
+    import zipfile
+    if not zipfile.is_zipfile(filepath):
+        return ValueError("Invalid update file type")
+
+
+def update_script_read(filepath: str) -> str:
+    import os
+    with open(os.path.join(os.path.dirname(__file__), "update.py")) as file:
+        return file.read().replace("FILEPATH", filepath)
+
+
+def update_preferences(preferences: 'RBFDriverPreferences',
+                       status=str,
+                       **kwargs: Dict[str, Any]) -> None:
+    preferences.update_status = status
+    for key, value in kwargs.items():
+        preferences[key] = value
