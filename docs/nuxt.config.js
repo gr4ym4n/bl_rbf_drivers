@@ -9,6 +9,11 @@ export default theme({
     docs: {
         primaryColor: '#8b3577'
     },
+    head: {
+        link: [
+            {rel: 'icon', type: 'image/x-icon', href: '/bl_rbf_drivers/favicon.ico'}
+        ]
+    },
     i18n: {
         locales: () => [{
           code: 'en',
