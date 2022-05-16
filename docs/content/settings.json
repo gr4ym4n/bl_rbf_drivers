@@ -2,5 +2,6 @@
     "title": "RBF Drivers",
     "github": "jamesvsnowden/bl_rbf_drivers",
     "twitter": "@jamesvsnowden",
-    "logo": "/bl_rbf_drivers/svg/rbf-drivers-logo.svg"
+    "logo": "/bl_rbf_drivers/svg/rbf-drivers-logo.svg",
+    "url": "https://jamesvsnowden.github.io/bl_rbf_drivers/"
 }
