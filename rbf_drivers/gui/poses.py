@@ -98,18 +98,14 @@ class RBFDRIVERS_PT_poses(GUIUtils, Panel):
                 and object.is_property_set("rbf_drivers")
                 and object.rbf_drivers.active is not None)
 
+    def draw_header(self, _: 'Context') -> None:
+        self.layout.label(icon='CON_ARMATURE')
+
     def draw(self, context: 'Context') -> None:
         driver = context.object.rbf_drivers.active
+        poses = driver.poses
         layout = self.subpanel(self.layout)
         layout.separator(factor=0.5)
-
-        poses = driver.poses
-
-        row = layout.row()
-        row.scale_y = 0.6
-        row.alignment = 'RIGHT'
-        row.label(text="Weight")
-        row.separator(factor=4.5)
 
         row = layout.row()
         col = row.column()

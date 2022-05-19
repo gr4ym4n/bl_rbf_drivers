@@ -22,6 +22,7 @@ class RBFDRIVERS_OT_addon_reset_update_status(Operator):
         prefs.new_release_url = ""
         prefs.new_release_date = ""
         prefs.new_release_path = ""
+        prefs.new_release_notes = ""
         prefs.new_release_is_stable = False
         prefs.update_error = ""
         prefs.update_status = 'NONE'
@@ -139,9 +140,10 @@ class RBFDRIVERS_OT_check_for_update(Operator):
 
         update_preferences(prefs, 'AVAILABLE',
                            new_release_url=url,
-                           new_release_version=result.get("version"),
-                           new_release_date=result.get("release_date"),
-                           new_release_is_stable=(result.get("stable", False) in (True, 'true')))
+                           new_release_version=result.get("version", ""),
+                           new_release_date=result.get("release_date", ""),
+                           new_release_is_stable=(result.get("stable", False) in (True, 'true')),
+                           new_release_notes=result.get("release_notes", ""))
         return {'FINISHED'}
 
     def execute(self, context: 'Context') -> Set[str]:

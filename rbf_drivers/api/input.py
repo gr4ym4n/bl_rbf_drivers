@@ -168,6 +168,10 @@ def input_data_type_update_handler(input: 'RBFDriverInput', _: 'Context') -> Non
     dispatch_event(InputDataTypeUpdateEvent(input, input.data_type))
 
 
+def input_is_enabled(input: 'RBFDriverInput') -> bool:
+    return any(input_variable_is_enabled(variable) for variable in input.variables)
+
+
 def input_is_valid(input: 'RBFDriverInput') -> bool:
     variables = tuple(filter(input_variable_is_enabled, input.variables))
     return bool(len(variables)) and all(map(input_variable_is_valid, variables))
@@ -253,6 +257,13 @@ class RBFDriverInput(Symmetrical, PropertyGroup):
         items=INPUT_DATA_TYPE_ITEMS,
         default=INPUT_DATA_TYPE_ITEMS[0][0],
         update=input_data_type_update_handler,
+        options=set()
+        )
+
+    is_enabled: BoolProperty(
+        name="Enabled",
+        description="Whether the input has at least one enabled variable",
+        get=input_is_enabled,
         options=set()
         )
 

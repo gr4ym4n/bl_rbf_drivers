@@ -1,6 +1,6 @@
 
 from typing import TYPE_CHECKING
-from bpy.types import Menu, Panel, UIList
+from bpy.types import Menu, Panel, UILayout, UIList
 from .utils import GUIUtils
 from ..lib.curve_mapping import draw_curve_manager_ui
 from ..api.driver import DRIVER_TYPE_ICONS
@@ -10,7 +10,7 @@ from ..ops.driver import (RBFDRIVERS_OT_make_generic, RBFDRIVERS_OT_new,
                           RBFDRIVERS_OT_move_up,
                           RBFDRIVERS_OT_move_down)
 if TYPE_CHECKING:
-    from bpy.types import Context, UILayout
+    from bpy.types import Context
     from ..api.driver import RBFDriver
 
 class RBFDRIVERS_UL_drivers(UIList):
@@ -98,6 +98,12 @@ class RBFDRIVERS_PT_interpolation(GUIUtils, Panel):
                 and object.is_property_set("rbf_drivers")
                 and object.rbf_drivers.active is not None)
 
+    def draw_header(self, context: 'Context') -> None:
+        layout = self.layout
+        interp = context.object.rbf_drivers.active.interpolation
+        layout.label(icon_value=UILayout.enum_item_icon(interp, "interpolation", interp.interpolation))
+
     def draw(self, context: 'Context') -> None:
         layout = self.subpanel(self.layout)
+        layout.separator(factor=0.5)
         draw_curve_manager_ui(layout, context.object.rbf_drivers.active.interpolation)

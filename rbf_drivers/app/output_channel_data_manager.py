@@ -7,15 +7,13 @@ from operator import attrgetter
 from typing import TYPE_CHECKING, Iterable, Iterator, Tuple, Union
 from functools import partial
 import numpy as np
-from .events import dispatch_event, event_handler
+from .events import event_handler
 from .utils import owner_resolve
 from ..api.pose import PoseUpdateEvent
 from ..api.poses import PoseMoveEvent, PoseNewEvent, PoseRemovedEvent
-from ..api.output import (OUTPUT_ROTATION_MODE_TABLE,
-                          OutputBoneTargetChangeEvent,
+from ..api.output import (OutputBoneTargetChangeEvent,
                           OutputObjectChangeEvent,
-                          OutputRotationModeChangeEvent,
-                          output_rotation_mode)
+                          OutputRotationModeChangeEvent)
 from ..api.drivers import DriverNewEvent
 from ..lib.rotation_utils import (axis_angle_to_euler,
                                   axis_angle_to_quaternion,
@@ -108,11 +106,9 @@ def on_output_bone_target_change_event(event: Union[OutputBoneTargetChangeEvent,
                 mode = 'EULER'
 
             if output.rotation_mode != mode:
-                # Manually set property and dispatch event to avoid
-                # rotation_mode_is_user_defined flag being set
-                prev = output_rotation_mode(output)
-                output["rotation_mode"] = OUTPUT_ROTATION_MODE_TABLE[mode]
-                dispatch_event(OutputRotationModeChangeEvent(output, mode, prev))
+                userdef = output.rotation_mode_is_user_defined
+                output.rotation_mode = mode
+                output["rotation_mode_is_user_defined"] = userdef
 
 
 @event_handler(PoseNewEvent)

@@ -20,11 +20,14 @@ bl_info = {
     "author": "James Snowden",
     "version": (2, 0, 0),
     "blender": (3, 0, 0),
-    "location": "View3D",
-    "wiki_url": "https://rbfdrivers.readthedocs.io/en/latest/",
+    "location": "View3D > Properties > Object",
+    "doc_url": "https://jamesvsnowden.github.io/bl_rbf_drivers/",
+    "tracker_url": "https://github.com/jamesvsnowden/bl_rbf_drivers/issues",
     "category": "Animation",
     "warning": ""
 }
+
+UPDATE_URL = ""
 
 from .lib.curve_mapping import (BLCMAP_CurvePointProperties,
                                 BLCMAP_CurveProperties,
@@ -102,11 +105,6 @@ from .ops.driver import (RBFDRIVERS_OT_new,
                          LegacyDriver,
                          RBFDRIVERS_OT_upgrade)
 
-from .ops.addon import (RBFDRIVERS_OT_addon_reset_update_status,
-                        RBFDRIVERS_OT_addon_install_update,
-                        RBFDRIVERS_OT_check_for_update,
-                        RBFDRIVERS_OT_addon_download_update)
-
 from .gui.generic import RBFDRIVERS_UL_selection_list
 from .gui.drivers import (RBFDRIVERS_UL_drivers,
                           RBFDRIVERS_MT_driver_context_menu,
@@ -178,10 +176,6 @@ def classes():
         RBFDRIVERS_OT_move_down,
         LegacyDriver,
         RBFDRIVERS_OT_upgrade,
-        RBFDRIVERS_OT_addon_reset_update_status,
-        RBFDRIVERS_OT_addon_install_update,
-        RBFDRIVERS_OT_check_for_update,
-        RBFDRIVERS_OT_addon_download_update,
         # gui
         RBFDRIVERS_UL_selection_list,
         RBFDRIVERS_UL_drivers,
@@ -207,6 +201,9 @@ def register():
     BLCMAP_OT_curve_paste.bl_idname = "rbf_driver.curve_paste"
     BLCMAP_OT_handle_type_set.bl_idname = "rbf_driver.handle_type_set"
 
+    from .lib import update
+    update.register("rbf_drivers", UPDATE_URL)
+
     for cls in classes():
         register_class(cls)
 
@@ -229,6 +226,9 @@ def unregister():
 
     for cls in reversed(classes()):
         unregister_class(cls)
+
+    from .lib import update
+    update.unregister()
 
     modules_ = sys.modules 
     modules_ = dict(sorted(modules_.items(), key=operator.itemgetter(0)))

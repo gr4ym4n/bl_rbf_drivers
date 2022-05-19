@@ -19,14 +19,15 @@ def output_init__location(output: 'RBFDriverOutput', pose_count: int) -> None:
 
 
 def output_init__rotation(output: 'RBFDriverOutput', pose_count: int) -> None:
-    output["rotation_mode"] = OUTPUT_ROTATION_MODE_TABLE['QUATERNION']
+    output["rotation_mode"] = OUTPUT_ROTATION_MODE_TABLE['EULER']
     for index, axis in enumerate("WXYZ"):
         channel = output.channels.collection__internal__.add()
         channel["name"] = axis
-        channel["array_index"] = index
-        channel["data_path"] = "rotation_quaternion"
-        channel["default_value"] = float(index == 0)
-        channel["is_enabled"] = True
+        if index > 0:
+            channel["array_index"] = index - 1
+        channel["data_path"] = "rotation_euler"
+        channel["default_value"] = 0.0
+        channel["is_enabled"] = False
         channel.data.__init__([channel.default_value] * pose_count)
 
 

@@ -13,3 +13,6 @@
 [submodule "rbf_drivers/lib/symmetry"]
 	path = rbf_drivers/lib/symmetry
 	url = https://github.com/jamesvsnowden/bl_symmetry.git
+[submodule "rbf_drivers/lib/update"]
+	path = rbf_drivers/lib/update
+	url = https://github.com/jamesvsnowden/bl_addon_update_strategy.git

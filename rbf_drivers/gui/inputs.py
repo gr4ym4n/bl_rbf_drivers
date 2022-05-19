@@ -58,9 +58,21 @@ class RBFDRIVERS_PT_inputs(GUILayerUtils, Panel):
                 and object.is_property_set("rbf_drivers")
                 and object.rbf_drivers.active is not None)
 
+    def draw_header(self, context: 'Context') -> None:
+        layout = self.layout
+        inputs = context.object.rbf_drivers.active.inputs
+        if len(inputs) == 0 or not any(input.is_valid for input in inputs):
+            layout.label(icon='ERROR')
+        elif not any(input.is_enabled for input in inputs):
+            layout.label(icon='RADIOBUT_OFF')
+        else:
+            layout.label(icon='RADIOBUT_ON')
+
     def draw(self, context: 'Context') -> None:
         layout = self.subpanel(self.layout)
         inputs = context.object.rbf_drivers.active.inputs
+
+        layout.separator(factor=0.5)
 
         row = layout.row()
         column = row.column()

@@ -35,15 +35,17 @@ You can select any object as the location input target. Selecting an armature ob
 
 #### Channels
 
-By default the **Location** input will read values from the input target in its local coordinate space. This is usually what you will want, but you can also use transform or world spaces to suits various strategies.
+* **Transform Space**  
+  By default the **Location** input will read values from the input target in its local coordinate space. This is usually what you will want, but you can also use transform or world spaces to suits various strategies.
 
-<alert type="info">
+  <alert type="info">
 
-The various coordinate spaces used within Blender can be the cause of some confusion. If you're not sure what they mean you can read up on them on the [Blender manual page](https://docs.blender.org/manual/en/latest/editors/3dview/controls/orientation.html). RBF drivers offer the same transform spaces as Blender's native drivers.
+  The various coordinate spaces used within Blender can be the cause of some confusion. If you're not sure what they mean you can read up on them on the [Blender manual page](https://docs.blender.org/manual/en/latest/editors/3dview/controls/orientation.html). RBF drivers offer the same transform spaces as Blender's native drivers.
 
-</alert>
+  </alert>
 
-The **Channels** settings allow you to select which transform channels you want to use as input to the RBF driver, and what transform space 
+* **Axes**  
+  Toggle which axis or axes of the target's location you want to use as input to the RBF Driver.
 
 ### Rotation
 
@@ -57,37 +59,55 @@ You can select any object as the rotation input target. Selecting an armature ob
 
 #### Channels
 
-The channel options allow you to select which rotation channels should be used as inputs to the RBF driver.
+<table class="table-fixed">
 
-##### Rotation Modes
+<tr>
+<td style="width:40%;"><img alt="Euler rotation input mode" src="/bl_rbf_drivers/img/manual-inputs-rotation-euler.jpg"></td>
+<td style="width:50%;">
 
-There are several rotation modes to choose from. The rotation mode does not need to match the rotation mode of the target.
+**Euler**  
+Use the euler rotation values of the input target. You can additionally select the rotation order, coordinate space and which rotation channels to use.
 
-###### Euler
+</td>
+</tr>
 
-Select **Euler** from the dropdown menu to use the euler rotation channels. With **Euler** selected you can also select the rotation order.
+<tr>
+<td><img alt="Quaternion rotation input mode" src="/bl_rbf_drivers/img/manual-inputs-rotation-quaternion.jpg"></td>
+<td>
 
-<alert type="warning">
+**Quaternion**  
+Use the quaternion rotation values of the input target. You can also select the coordinate space to take the values from.
 
-Euler rotations are easy to understand but their use comes with some caveats. They are of course prone to [gimbal lock](https://en.wikipedia.org/wiki/Gimbal_lock) which can present issues during animation, but they can also present issues for the calculations that RBF drivers performs. If you're using more than two rotation axes as input to the RBF driver it is suggested that you use an alternative rotation mode.
+</td>
+</tr>
 
-</alert>
+<tr>
+<td><img alt="Swing rotation input mode" src="/bl_rbf_drivers/img/manual-inputs-rotation-swing.jpg"></td>
+<td>
 
-###### Quaternion
+**Swing**  
+Decompose the input target rotation values and extract swing rotation values. You can select which axis of the input target the swing should be on and the coordinate space to take the values from.
 
-Select **Quaternion** from the dropdown menu to use the quaternion rotation channels of the input target. The **Use Logarithmic Map** checkbox 
+</td>
+</tr>
+
+<tr>
+<td><img alt="Twist rotation input mode" src="/bl_rbf_drivers/img/manual-inputs-rotation-twist.jpg"></td>
+<td>
+
+**Twist**  
+Decompose the input target rotation values and extract the twist rotation angle around the given axis. Additional options are the selection of the axis of the input target the twist should be around and the coordinate space to take the values from.
+
+</td>
+</tr>
+
+</table>
 
 <alert type="info">
 
-RBF drivers will always use all rotation channels when **Quaternion** is selected as the components of a quaternion are not particularly descriptive in isolation. If for some reason you want to isolate one or more components of a quaternion rotation you can nevertheless achieve this using the [**User-Defined**](#user-defined) input type.
+Swing/twist rotations can be particularly useful with RBF drivers. If you're not familiar with them you can read more about them in [the relevant blender manual page](https://docs.blender.org/manual/en/latest/animation/drivers/drivers_panel.html#rotation-channel-modes).
 
 </alert>
-
-###### Swing
-
-If the **Swing** option is selected, the RBF driver will decompose the input target's rotation and use only the swing rotation values. This can be useful if you only want to take into account the direction an object or bone is pointing in.
-
-By default the **Rotation** input will read values from the input target in its local coordinate space. This is usually what you will want, but you can also use transform or world spaces to suits various strategies.
 
 <alert type="info">
 
@@ -105,11 +125,17 @@ The **Scale** input type reads the scale values of an object or pose bone.
 
 You can select any object as the scale input target. Selecting an armature object will reveal a second field where you can optionally select a pose bone target.
 
-<alert type="info">
+* **Transform Space**  
+  By default the **Scale** input will read values from the input target in its local coordinate space. This is usually what you will want, but you can also use transform or world spaces to suits various strategies.
 
-The various coordinate spaces used within Blender can be the cause of some confusion. If you're not sure what they mean you can read up on them on the [Blender manual page](https://docs.blender.org/manual/en/latest/editors/3dview/controls/orientation.html). RBF drivers offer the same transform spaces as Blender's native drivers.
+  <alert type="info">
 
-</alert>
+  The various coordinate spaces used within Blender can be the cause of some confusion. If you're not sure what they mean you can read up on them on the [Blender manual page](https://docs.blender.org/manual/en/latest/editors/3dview/controls/orientation.html). RBF drivers offer the same transform spaces as Blender's native drivers.
+
+  </alert>
+
+* **Axes**  
+  Toggle which axis or axes of the target's scale you want to use as input to the RBF Driver.
 
 ### Rotational Difference
 
@@ -155,7 +181,7 @@ For **User-Defined** inputs there are three sub-types available in the **Type** 
 
 <alert type="info">
 
-If you have selected **Quaternion** as the input data type, then as long as the variables  you have defined describe a quaternion value (i.e. there are 4 variables), then you will also have the option to **Extract Swing Rotation** around a given axis. This will behave in the same way as a [swing] rotation input, but allows you to construct an arbitrary quaternion rotation yourself
+If you have selected **Quaternion** as the input data type, then as long as the variables  you have defined describe a quaternion value (i.e. there are 4 variables), then you will also have the option to **Extract Swing Rotation** around a given axis. This will behave in the same way as a **Swing** rotation input, but allows you to construct an arbitrary quaternion rotation yourself.
 
 </alert>
 
@@ -215,6 +241,18 @@ The number of variables you can add to a single input is limited to being 16. If
 
 ## Decomposing Inputs
 
-If you've set up an input of any type 
+![Decompose input variables action](/bl_rbf_drivers/img/manual-inputs-decompose.jpg)
+
+If you've set up an input of any type other than user-defined, then the **Decompose Input Variables** action will be available to you from the dropdown actions menu to the right of the inputs list. Invoking the action will convert the input to a [**User-Defined**](#user-defined) input and its channels to [input variables](#variables).
+
+<alert type="warning">
+
+While you can undo the process if you change your mind, you cannot later convert a **User-Defined** input to any other type of input, so use with care!
+
+</alert>
 
 ## Removing Inputs
+
+![Remove input button](/bl_rbf_drivers/img/manual-inputs-remove.jpg)
+
+To remove an input, simply click on the **Remove Input** (**-**) button next to the list of inputs.

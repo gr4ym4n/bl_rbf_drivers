@@ -55,28 +55,25 @@ class RBFDRIVERS_PT_outputs(GUILayerUtils, Panel):
                 and object.is_property_set("rbf_drivers")
                 and object.rbf_drivers.active is not None)
 
+    def draw_header(self, context: 'Context') -> None:
+        layout = self.layout
+        outputs = context.object.rbf_drivers.active.outputs
+        if len(outputs) == 0 or not any(output.is_valid for output in outputs):
+            layout.label(icon='ERROR')
+        elif not any(output.is_enabled for output in outputs):
+            layout.label(icon='RADIOBUT_OFF')
+        else:
+            layout.prop(outputs, "mute",
+                        text="",
+                        icon=f'CHECKBOX_{"DE" if outputs.mute else ""}HLT',
+                        emboss=False)
+
     def draw(self, context: 'Context') -> None:
         layout = self.subpanel(self.layout)
         driver = context.object.rbf_drivers.active
         outputs = driver.outputs
 
-        if len(outputs):
-            row = layout.row()
-            row.scale_y = 0.6
-            row.alignment = 'RIGHT'
-            row.label(text="Active:")
-
-            if not any(output.is_valid for output in outputs):
-                row.label(icon='ERROR')
-            elif not any(output.is_enabled for output in outputs):
-                row.label(icon='RADIOBUT_OFF')
-            else:
-                row.prop(outputs, "mute",
-                        text="",
-                        icon=f'CHECKBOX_{"DE" if outputs.mute else ""}HLT',
-                        emboss=False)
-            
-            row.separator(factor=4.2)
+        layout.separator(factor=0.5)
         
         row = layout.row()
         column = row.column()

@@ -107,11 +107,11 @@ class RBFDriverOutputs(Reorderable,
                              f'Expected input to be {RBFDriverOutput.__name__}, '
                              f'not {output.__class__.__name__}'))
 
-        index = next((index for item, index in enumerate(self) if item == output), -1)
+        index = next((index for index, item in enumerate(self) if item == output), -1)
 
         if index == -1:
             raise ValueError((f'{self.__class__.__name__}.remove(output): '
-                             f'Output {output} not found in collection {self}'))
+                              f'{output} not found in {self}'))
 
         dispatch_event(OutputDisposableEvent(output))
         self.collection__internal__.remove(index)
