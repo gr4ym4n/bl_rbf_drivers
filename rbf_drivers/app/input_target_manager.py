@@ -15,15 +15,15 @@ from ..api.input import (InputBoneTargetUpdateEvent,
                          InputTransformSpaceChangeEvent)
 from ..lib.transform_utils import ROTATION_MODE_TABLE, TRANSFORM_SPACE_TABLE
 if TYPE_CHECKING:
-    from ..api.input_target import RBFDriverInputTarget
-    from ..api.input import RBFDriverInput
+    from ..api.input_target import InputTarget
+    from ..api.input import Input
     from ..api.driver import RBFDriver
 
 
 targets = attrgetter("targets")
 
 
-def targets_chain(input: 'RBFDriverInput') -> Iterator['RBFDriverInputTarget']:
+def targets_chain(input: 'Input') -> Iterator['InputTarget']:
     return chain(*tuple(map(targets, input.variables)))
 
 
@@ -72,15 +72,15 @@ def on_input_variable_new(event: InputVariableNewEvent) -> None:
     variable = event.variable
 
     variable.targets["length__internal__"] = 1
-    variable.targets.collection__internal__.add()
-    variable.targets.collection__internal__.add()
+    variable.targets.internal__.add()
+    variable.targets.internal__.add()
 
-    input: 'RBFDriverInput' = owner_resolve(variable, ".variables")
+    input: 'Input' = owner_resolve(variable, ".variables")
 
     if input.type == 'SHAPE_KEY':
         object = input.object
         compat = {'MESH', 'LATTICE', 'CURVE'}
-        target: 'RBFDriverInputTarget' = variable.targets[0]
+        target: 'InputTarget' = variable.targets[0]
 
         target["id_type"] = INPUT_TARGET_ID_TYPE_TABLE['KEY']
         target["id"] = object.data.shape_keys if object and object.type in compat else None
@@ -96,7 +96,7 @@ def on_input_variable_name_update(event: InputVariableNameUpdateEvent) -> None:
     '''
     Updates a shape key input target's data path according to the input variable's name
     '''
-    input: 'RBFDriverInput' = owner_resolve(event.variable, ".variables")
+    input: 'Input' = owner_resolve(event.variable, ".variables")
     if input.type == 'SHAPE_KEY':
         event.variable.targets[0]["data_path"] = f'key_blocks["{event.value}"].value'
 

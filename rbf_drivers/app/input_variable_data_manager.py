@@ -9,9 +9,9 @@ from functools import partial
 import numpy as np
 from .events import event_handler
 from .utils import owner_resolve
-from ..api.input_variable_data_sample import InputVariableDataSampleUpdateEvent
-from ..api.input import InputRotationModeChangeEvent
-from ..api.pose import PoseUpdateEvent
+from ..api.input_sample import InputSampleUpdateEvent
+from ..api.inputs import InputRotationModeChangeEvent
+from ..api.poses import PoseUpdateEvent
 from ..api.poses import PoseMoveEvent, PoseNewEvent, PoseRemovedEvent
 from ..lib.rotation_utils import (noop,
                                   euler_to_quaternion,
@@ -36,9 +36,9 @@ from ..lib.rotation_utils import (noop,
                                   swing_twist_z_to_swing_twist_x,
                                   swing_twist_z_to_swing_twist_y)
 if TYPE_CHECKING:
-    from ..api.input_variable_data import RBFDriverInputVariableData
-    from ..api.input_variable import RBFDriverInputVariable
-    from ..api.input import RBFDriverInput
+    from ..api.input_data import InputData
+    from ..api.input_variables import InputVariable
+    from ..api.inputs import Input
 
 ROTATION_CONVERSION_LUT = {
         'EULER': {
@@ -95,19 +95,19 @@ variables = attrgetter("variables")
 data = attrgetter("data")
 
 
-def variable_state(variable: 'RBFDriverInputVariable') -> Tuple['RBFDriverInputVariableData', float]:
+def variable_state(variable: 'InputVariable') -> Tuple['InputData', float]:
     return variable.data, variable.value
 
 
-def variable_chain(inputs: Iterable['RBFDriverInput']) -> Iterator['RBFDriverInputVariable']:
+def variable_chain(inputs: Iterable['Input']) -> Iterator['InputVariable']:
     return chain(*tuple(map(variables, inputs)))
 
 
-def variable_data_chain(inputs: Iterable['RBFDriverInput']) -> Iterator['RBFDriverInputVariableData']:
+def variable_data_chain(inputs: Iterable['Input']) -> Iterator['InputData']:
     return map(data, variable_chain(inputs))
 
 
-def variable_state_chain(inputs: Iterable['RBFDriverInput']) -> Iterator[Tuple['RBFDriverInputVariableData', float]]:
+def variable_state_chain(inputs: Iterable['Input']) -> Iterator[Tuple['InputData', float]]:
     return map(variable_state, variable_chain(inputs))
 
 
@@ -164,7 +164,7 @@ def on_pose_move(event: PoseMoveEvent) -> None:
     '''
     a, b = event.from_index, event.to_index
     for data in variable_data_chain(owner_resolve(event.pose, ".poses").inputs):
-        data.data__internal__.move(a, b)
+        data.internal__.move(a, b)
 
 
 @event_handler(PoseNewEvent)
@@ -173,7 +173,7 @@ def on_pose_new(event: PoseNewEvent) -> None:
     Appends input variable data when a new pose is added.
     '''
     for data, value in variable_state_chain(owner_resolve(event.pose, ".poses").inputs):
-        data.data__internal__.add().__init__(len(data)-1, value)
+        data.internal__.add().__init__(len(data)-1, value)
         data.update(propagate=False)
 
 
@@ -183,7 +183,7 @@ def on_pose_removed(event: PoseRemovedEvent) -> None:
     Removes input variable data when a pose is removed.
     '''
     for data in variable_data_chain(owner_resolve(event.poses, ".").inputs):
-        data.data__internal__.remove(event.index)
+        data.internal__.remove(event.index)
         data.update(propagate=False)
 
 
@@ -199,7 +199,7 @@ def on_pose_update(event: PoseUpdateEvent) -> None:
             data.update(propagate=False)
 
 
-@event_handler(InputVariableDataSampleUpdateEvent)
-def on_input_variable_data_sample_update(event: InputVariableDataSampleUpdateEvent) -> None:
-    data: 'RBFDriverInputVariableData' = owner_resolve(event.sample, ".data__internal__")
+@event_handler(InputSampleUpdateEvent)
+def on_input_variable_data_sample_update(event: InputSampleUpdateEvent) -> None:
+    data: 'InputData' = owner_resolve(event.sample, ".internal__")
     data.update(propagate=False)

@@ -1,5 +1,18 @@
 
-from typing import Any, Generic, Iterable, Iterator, List, Optional, Protocol, Tuple, TypeVar, Union
+from typing import (
+    Any,
+    Generic,
+    Iterable,
+    Iterator,
+    List,
+    Optional,
+    Protocol,
+    Sequence,
+    Tuple,
+    TypeVar,
+    Union,
+    TYPE_CHECKING
+    )
 from uuid import uuid4
 from bpy.types import PropertyGroup
 from bpy.props import StringProperty
@@ -30,29 +43,36 @@ class BPYPropCollectionInterface(Protocol[T]):
     def __len__(self) -> int: pass
     def __iter__(self) -> Iterable[T]: pass
     def __getitem__(self, key: Union[int, str, slice]) -> Union[T, List[T]]: pass
+    def add(self) -> T: pass
+    def find(self, name: str) -> int: pass
+    def clear(self) -> None: pass
+    def foreach_get(self, key: str, data: Sequence[Any]) -> None: pass
+    def foreach_set(self, key: str, data: Sequence[Any]) -> None: pass
+    def get(self, name: str) -> Optional[T]: pass
     def keys(self) -> Iterable[str]: pass
     def items(self) -> Iterable[T]: pass
     def move(self, from_index: int, to_index: int) -> None: pass
+    def remove(self, index: int) -> None: pass
     def values(self) -> Iterable[T]: pass
 
 
 class Collection(Generic[T]):
 
     @property
-    def collection__internal__(self) -> BPYPropCollectionInterface[T]:
-        raise NotImplementedError(f'{self.__class__.__name__}.collection__internal__')
+    def internal__(self) -> BPYPropCollectionInterface[T]:
+        raise NotImplementedError(f'{self.__class__.__name__}.internal__')
 
     def __len__(self) -> int:
-        return len(self.collection__internal__)
+        return len(self.internal__)
 
     def __iter__(self) -> Iterator[T]:
-        return iter(self.collection__internal__)
+        return iter(self.internal__)
 
     def __getitem__(self, key: Union[int, str, slice]) -> Union[T, List[T]]:
         if not isinstance(key, (int, str, slice)):
             raise TypeError((f'{self.__class__.__name__}[key]: '
                              f'Expected key to be int, str or slice, not {key.__class__.__name__}'))
-        return self.collection__internal__[key]
+        return self.internal__[key]
 
     def __contains__(self, key: Union[str, Any]) -> bool:
         return self.find(key) != -1 if isinstance(key, str) else any(member == key for member in self)
@@ -81,15 +101,11 @@ class Collection(Generic[T]):
 
     def keys(self) -> Iterable[str]:
         '''Return the names of collection members.'''
-        return self.collection__internal__.keys()
+        return self.internal__.keys()
 
     def items(self) -> Iterable[Tuple[str, T]]:
         '''Return name value pairs of collection members'''
-        return self.collection__internal__.items()
-
-    def values(self) -> Iterable[T]:
-        '''Return the values of collection'''
-        return self.collection__internal__.values()
+        return self.internal__.items()
 
 
 class Reorderable(Collection[T]):
@@ -112,7 +128,7 @@ class Reorderable(Collection[T]):
             raise IndexError((f'{self.__class__.__name__}.move(from_index, to_index): '
                               f'to_index {to_index} out of range 0-{len(self)-1}'))
 
-        self.collection__internal__.move(from_index, to_index)
+        self.internal__.move(from_index, to_index)
 
 
 class Searchable(Generic[T]):

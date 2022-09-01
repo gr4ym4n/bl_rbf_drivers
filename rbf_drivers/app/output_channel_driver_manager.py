@@ -13,10 +13,10 @@ from ..lib.driver_utils import (driver_ensure,
                                 driver_remove,
                                 driver_variables_clear,
                                 DriverVariableNameGenerator)
-from ..api.pose import PoseUpdateEvent
+from ..api.poses import PoseUpdateEvent
 from ..api.poses import PoseNewEvent, PoseRemovedEvent
-from ..api.output_channel_data_sample import OutputChannelDataSampleUpdateEvent
-from ..api.output_channel import (OutputChannelMuteUpdateEvent,
+from ..api.output_data import OutputSampleUpdateEvent
+from ..api.output_channels import (OutputChannelMuteUpdateEvent,
                                   OutputChannelNameChangeEvent,
                                   output_channel_is_enabled)
 from ..api.output import (OutputBoneTargetChangeEvent,
@@ -29,16 +29,16 @@ from ..api.output import (OutputBoneTargetChangeEvent,
 from ..api.drivers import DriverDisposableEvent
 if TYPE_CHECKING:
     from bpy.types import FCurve, Object
-    from ..api.output_channel import RBFDriverOutputChannel
+    from ..api.output_channels import OutputChannel
     from ..api.output_channels import RBFDriverOutputChannels
-    from ..api.output import RBFDriverOutput
+    from ..api.output import Output
     from ..api.driver import RBFDriver
 
 EPSILON = 10 * np.finfo(float).resolution
 MAX_PARAMS = 32
 
 
-def output_assign_channel_data_targets__singleprop(output: 'RBFDriverOutput') -> None:
+def output_assign_channel_data_targets__singleprop(output: 'Output') -> None:
     path = output.data_path
     channel = output.channels[0]
 
@@ -55,13 +55,13 @@ def output_assign_channel_data_targets__singleprop(output: 'RBFDriverOutput') ->
     channel.property_unset("array_index")
 
 
-def output_assign_channel_data_targets__shapekey(output: 'RBFDriverOutput') -> None:
+def output_assign_channel_data_targets__shapekey(output: 'Output') -> None:
     channel = output.channels[0]
     channel["data_path"] = f'key_blocks["{channel.name}"].value'
     channel.property_unset("array_index")
 
 
-def output_assign_channel_data_targets__transforms(output: 'RBFDriverOutput') -> None:
+def output_assign_channel_data_targets__transforms(output: 'Output') -> None:
     if output.type == 'ROTATION':
         suffix = f'rotation_{output.rotation_mode.lower()}'
         offset = -int(output.rotation_mode == 'EULER')
@@ -84,7 +84,7 @@ def output_assign_channel_data_targets__transforms(output: 'RBFDriverOutput') ->
             channel.property_unset("array_index")
 
 
-def output_assign_channel_data_targets(output: 'RBFDriverOutput') -> None:
+def output_assign_channel_data_targets(output: 'Output') -> None:
     type = output.type
     if type == 'SHAPE_KEY':
         output_assign_channel_data_targets__shapekey(output)
@@ -94,37 +94,37 @@ def output_assign_channel_data_targets(output: 'RBFDriverOutput') -> None:
         output_assign_channel_data_targets__transforms(output)
 
 
-def output_channel_data_target(channel: 'RBFDriverOutputChannel') -> Union[Tuple[str], Tuple[str, int]]:
+def output_channel_data_target(channel: 'OutputChannel') -> Union[Tuple[str], Tuple[str, int]]:
     if channel.is_property_set("array_index"):
         return (channel.data_path, channel.array_index)
     return (channel.data_path,)
 
 
-def idprop_cdata(channel: 'RBFDriverOutputChannel') -> str:
+def idprop_cdata(channel: 'OutputChannel') -> str:
     return f'rbfn_cdata_{channel.identifier}'
 
 
-def idprop_cnode(channel: 'RBFDriverOutputChannel') -> str:
+def idprop_cnode(channel: 'OutputChannel') -> str:
     return f'rbfn_cnode_{channel.identifier}'
 
 
-def idprop_qlend_magnitude(output: 'RBFDriverOutput') -> str:
+def idprop_qlend_magnitude(output: 'Output') -> str:
     return f'rbfn_qbmag_{output.identifier}'
 
 
-def idprop_qblend_logsum(output: 'RBFDriverOutput') -> str:
+def idprop_qblend_logsum(output: 'Output') -> str:
     return f'rbfn_qbsum_{output.identifier}'
 
 
-def idprop_qlend_sine(output: 'RBFDriverOutput') -> str:
+def idprop_qlend_sine(output: 'Output') -> str:
     return f'rbfn_qbsin_{output.identifier}'
 
 
-def idprop_qlend_exponent(output: 'RBFDriverOutput') -> str:
+def idprop_qlend_exponent(output: 'Output') -> str:
     return f'rbfn_qbexp_{output.identifier}'
 
 
-def idprop_qlend_exponential_map(output: 'RBFDriverOutput') -> str:
+def idprop_qlend_exponential_map(output: 'Output') -> str:
     return f'rbfn_qbmap_{output.identifier}'
 
 
@@ -339,8 +339,8 @@ def output_channel_driver_init__sum(fcurve: 'FCurve',
         driver.expression = f'{variable.name}*({"+".join(variables[:-1])})'
 
 
-def output_channel_activate__weighted_average(output: 'RBFDriverOutput',
-                                              channel: 'RBFDriverOutputChannel') -> None:
+def output_channel_activate__weighted_average(output: 'Output',
+                                              channel: 'OutputChannel') -> None:
     object = output.id_data
     id = object.data
     propname = idprop_cdata(channel)
@@ -381,13 +381,13 @@ def output_channel_activate__weighted_average(output: 'RBFDriverOutput',
         output_channel_driver_init__dot(fcurve, object, weights, samples, output.influence.data_path)
 
 
-def output_activate__weighted_average(output: 'RBFDriverOutput') -> None:
+def output_activate__weighted_average(output: 'Output') -> None:
     for channel in filter(output_channel_is_enabled, output.channels):
         if channel.id:
             output_channel_activate__weighted_average(output, channel)
 
 
-def output_activate__quaternion_blend(output: 'RBFDriverOutput') -> None:
+def output_activate__quaternion_blend(output: 'Output') -> None:
     object = output.object
 
     if object:
@@ -490,7 +490,7 @@ def output_activate__quaternion_blend(output: 'RBFDriverOutput') -> None:
             output_channel_driver_init__qblend_final(fcurve, object, mean, tokens)
 
 
-def output_deactivate__quaternion_blend(output: 'RBFDriverOutput') -> None:
+def output_deactivate__quaternion_blend(output: 'Output') -> None:
     object = output.object
     if object:
         for channel in output.channels:
@@ -508,15 +508,15 @@ def output_deactivate__quaternion_blend(output: 'RBFDriverOutput') -> None:
         idprop_remove(id, idprop(output), remove_drivers=True)
 
 
-def output_activate(output: 'RBFDriverOutput') -> None:
+def output_activate(output: 'Output') -> None:
     if output_uses_logarithmic_map(output):
         output_activate__quaternion_blend(output)
     else:
         output_activate__weighted_average(output)
 
 
-def output_channel_deactivate__weighted_average(output: 'RBFDriverOutput',
-                                                channel: 'RBFDriverOutputChannel') -> None:
+def output_channel_deactivate__weighted_average(output: 'Output',
+                                                channel: 'OutputChannel') -> None:
     id = channel.id
     if id and channel.data_path:
         driver_remove(id, *output_channel_data_target(channel))
@@ -525,31 +525,31 @@ def output_channel_deactivate__weighted_average(output: 'RBFDriverOutput',
     idprop_remove(id, idprop_cdata(channel), remove_drivers=False)
 
 
-def output_deactivate__weighted_average(output: 'RBFDriverOutput') -> None:
+def output_deactivate__weighted_average(output: 'Output') -> None:
     for channel in filter(output_channel_is_enabled, output.channels):
         output_channel_deactivate__weighted_average(output, channel)
 
 
-def output_uses_logarithmic_map(output: 'RBFDriverOutput') -> bool:
+def output_uses_logarithmic_map(output: 'Output') -> bool:
     return (output.type == 'ROTATION'
             and output.rotation_mode == 'QUATERNION'
             and output.use_logarithmic_map)
 
 
-def output_deactivate(output: 'RBFDriverOutput') -> None:
+def output_deactivate(output: 'Output') -> None:
     if output_uses_logarithmic_map(output):
         output_deactivate__quaternion_blend(output)
     else:
         output_deactivate__weighted_average(output)
 
 
-def outputs_activate_valid(outputs: Iterable['RBFDriverOutput']) -> None:
+def outputs_activate_valid(outputs: Iterable['Output']) -> None:
     for output in outputs:
         if output.is_valid:
             output_activate(output)
 
 
-def output_logmap_matrix(output: 'RBFDriverOutput') -> np.ndarray:
+def output_logmap_matrix(output: 'Output') -> np.ndarray:
     assert output.type == 'ROTATION' and output.rotation_mode == 'QUATERNION' and output.use_logarithmic_map
     data = np.array([tuple(ch.values()) for ch in output.channels], dtype=float)
     mean = np.mean(data, axis=1)
@@ -561,7 +561,7 @@ def output_logmap_matrix(output: 'RBFDriverOutput') -> np.ndarray:
 @event_handler(OutputChannelNameChangeEvent)
 def on_output_channel_name_change(event: OutputChannelNameChangeEvent) -> None:
     channel = event.channel
-    output: 'RBFDriverOutput' = owner_resolve(channel, ".channels")
+    output: 'Output' = owner_resolve(channel, ".channels")
     if output.type == 'SHAPE_KEY':
         output_deactivate(output)
         output_assign_channel_data_targets(output)
@@ -708,14 +708,14 @@ def on_driver_disposable(event: DriverDisposableEvent) -> None:
         output_deactivate(output)
 
 
-@event_handler(OutputChannelDataSampleUpdateEvent)
-def on_output_channel_data_sample_update(event: OutputChannelDataSampleUpdateEvent) -> None:
-    channel: 'RBFDriverOutputChannel' = owner_resolve(event.sample, ".data.")
+@event_handler(OutputSampleUpdateEvent)
+def on_output_channel_data_sample_update(event: OutputSampleUpdateEvent) -> None:
+    channel: 'OutputChannel' = owner_resolve(event.sample, ".data.")
     id = channel.id
     if id:
         data = id.get(idprop_cdata(channel))
         if isinstance(data, IDPropertyArray) and len(data) > event.sample.index:
-            output: 'RBFDriverOutput' = owner_resolve(channel, ".channels")
+            output: 'Output' = owner_resolve(channel, ".channels")
             if output_uses_logarithmic_map(output):
                 # An update to the data sample will result in an update to the mean quaternion
                 # used when blending quaternions. Since the mean is encoded in the final quaternion

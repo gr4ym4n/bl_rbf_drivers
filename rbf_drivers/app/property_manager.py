@@ -10,11 +10,11 @@ from ..api.poses import PoseNewEvent, PoseDisposableEvent
 from ..api.outputs import OutputNewEvent, OutputDisposableEvent
 if TYPE_CHECKING:
     from ..api.property_target import RBFDriverPropertyTarget
-    from ..api.pose import RBFDriverPose
-    from ..api.output import RBFDriverOutput
+    from ..api.poses import Pose
+    from ..api.output import Output
 
 
-def pose_idprops_create(pose: 'RBFDriverPose') -> None:
+def pose_idprops_create(pose: 'Pose') -> None:
     influence: 'RBFDriverPropertyTarget' = pose.influence
     influence["name"] = f'rbfn_pinf_{pose.identifier}'
     idprop_create(influence.id, influence.name, default=1.0, min=0.0, max=1.0, soft_min=0.0, soft_max=1.0)
@@ -24,7 +24,7 @@ def pose_idprops_create(pose: 'RBFDriverPose') -> None:
     idprop_create(radius.id, radius.name, default=1.0, min=0.0, soft_min=0.0, soft_max=5.0)
 
 
-def pose_idprops_remove(pose: 'RBFDriverPose') -> None:
+def pose_idprops_remove(pose: 'Pose') -> None:
     influence: 'RBFDriverPropertyTarget' = pose.influence
     idprop_remove(influence.id, influence.name)
 
@@ -32,13 +32,13 @@ def pose_idprops_remove(pose: 'RBFDriverPose') -> None:
     idprop_remove(radius.id, radius.name)
 
 
-def output_idprops_create(output: 'RBFDriverOutput') -> None:
+def output_idprops_create(output: 'Output') -> None:
     influence: 'RBFDriverPropertyTarget' = output.influence
     influence["name"] = f'rbfn_oinf_{output.identifier}'
     idprop_create(influence.id, influence.name, default=1.0, min=0.0, max=1.0, soft_min=0.0, soft_max=1.0)
 
 
-def output_idprops_remove(output: 'RBFDriverOutput') -> None:
+def output_idprops_remove(output: 'Output') -> None:
     influence: 'RBFDriverPropertyTarget' = output.influence
     idprop_remove(influence.id, influence.name)
 

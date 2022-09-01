@@ -4,7 +4,7 @@ from bpy.types import Operator
 from bpy.props import EnumProperty, IntProperty
 if TYPE_CHECKING:
     from bpy.types import Context
-    from ..api.poses import RBFDriverPoses
+    from ..api.poses import Poses
     from ..api.driver import RBFDriver
 
 
@@ -24,7 +24,7 @@ class RBFDRIVERS_OT_pose_add(Operator):
 
     def execute(self, context: 'Context') -> Set[str]:
         # TODO handle type for shape key drivers
-        poses: 'RBFDriverPoses' = context.object.rbf_drivers.active.poses
+        poses: 'Poses' = context.object.rbf_drivers.active.poses
         poses.new()
         return {'FINISHED'}
 
@@ -46,7 +46,7 @@ class RBFDRIVERS_OT_pose_remove(Operator):
                 and object.rbf_drivers.active.poses.active_index > 0)
 
     def execute(self, context: 'Context') -> Set[str]:
-        poses: 'RBFDriverPoses' = context.object.rbf_drivers.active.poses
+        poses: 'Poses' = context.object.rbf_drivers.active.poses
         poses.remove(poses.active)
         return {'FINISHED'}
 
@@ -148,7 +148,7 @@ class RBFDRIVERS_OT_pose_move_up(Operator):
                 and object.rbf_drivers.active.poses.active_index >= 1)
 
     def execute(self, context: 'Context') -> Set[str]:
-        poses: 'RBFDriverPoses' = context.object.rbf_drivers.active.poses
+        poses: 'Poses' = context.object.rbf_drivers.active.poses
         poses.move(poses.active_index, poses.active_index - 1)
         return {'FINISHED'}
 
@@ -171,6 +171,6 @@ class RBFDRIVERS_OT_pose_move_down(Operator):
                 and object.rbf_drivers.active.poses.active_index < len(object.rbf_drivers.active.poses) - 1)
 
     def execute(self, context: 'Context') -> Set[str]:
-        poses: 'RBFDriverPoses' = context.object.rbf_drivers.active.poses
+        poses: 'Poses' = context.object.rbf_drivers.active.poses
         poses.move(poses.active_index, poses.active_index + 1)
         return {'FINISHED'}

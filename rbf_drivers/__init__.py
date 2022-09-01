@@ -27,6 +27,16 @@ bl_info = {
     "warning": ""
 }
 
+def api_input_layer():
+    from .api.input_targets import InputTarget, InputTargets
+    from .api.input_data import InputSample, InputData
+    from .api.input_variables import InputVariable, InputVariables
+    from .api.input_distance_matrix import InputDistance, InputDistanceMatrix
+    from .api.input_pose_radii import InputPoseRadius, InputPoseRadii
+    
+
+
+
 UPDATE_URL = ""
 
 from .lib.curve_mapping import (BLCMAP_CurvePointProperties,
@@ -42,22 +52,22 @@ from .lib.curve_mapping import (BLCMAP_CurvePointProperties,
 
 from .api.selection_item import RBFDriverSelectionItem
 from .api.property_target import RBFDriverPropertyTarget
-from .api.input_target import RBFDriverInputTarget
-from .api.input_targets import RBFDriverInputTargets
-from .api.input_variable_data_sample import RBFDriverInputVariableDataSample
-from .api.input_variable_data import RBFDriverInputVariableData
-from .api.input_variable import RBFDriverInputVariable
-from .api.input_variables import RBFDriverInputVariables
-from .api.input import RBFDriverInput
-from .api.inputs import RBFDriverInputs
+from .api.input_targets import InputTarget
+from .api.input_targets import InputTargets
+from .api.input_sample import InputSample
+from .api.input_data import InputData
+from .api.input_variables import InputVariable
+from .api.input_variables import InputVariables
+from .api.inputs import Input
+from .api.inputs import Inputs
 from .api.pose_interpolation import RBFDriverPoseInterpolation
-from .api.pose import RBFDriverPose
-from .api.poses import RBFDriverPoses
-from .api.output_channel_data_sample import RBFDriverOutputChannelDataSample
-from .api.output_channel_data import RBFDriverOutputChannelData
-from .api.output_channel import RBFDriverOutputChannel
+from .api.poses import Pose
+from .api.poses import Poses
+from .api.output_data import OutputSample
+from .api.output_channel_data import OutputData
+from .api.output_channels import OutputChannel
 from .api.output_channels import RBFDriverOutputChannels
-from .api.output import RBFDriverOutput
+from .api.output import Output
 from .api.outputs import RBFDriverOutputs
 from .api.driver_interpolation import RBFDriverInterpolation
 from .api.driver import RBFDriver
@@ -130,22 +140,22 @@ def classes():
         # api
         RBFDriverSelectionItem,
         RBFDriverPropertyTarget,
-        RBFDriverInputTarget,
-        RBFDriverInputTargets,
-        RBFDriverInputVariableDataSample,
-        RBFDriverInputVariableData,
-        RBFDriverInputVariable,
-        RBFDriverInputVariables,
-        RBFDriverInput,
-        RBFDriverInputs,
+        InputTarget,
+        InputTargets,
+        InputSample,
+        InputData,
+        InputVariable,
+        InputVariables,
+        Input,
+        Inputs,
         RBFDriverPoseInterpolation,
-        RBFDriverPose,
-        RBFDriverPoses,
-        RBFDriverOutputChannelDataSample,
-        RBFDriverOutputChannelData,
-        RBFDriverOutputChannel,
+        Pose,
+        Poses,
+        OutputSample,
+        OutputData,
+        OutputChannel,
         RBFDriverOutputChannels,
-        RBFDriverOutput,
+        Output,
         RBFDriverOutputs,
         RBFDriverInterpolation,
         RBFDriver,

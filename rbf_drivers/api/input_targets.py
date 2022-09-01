@@ -1,41 +1,329 @@
 
-from typing import Any, Iterator, List, Optional, Union
-from bpy.types import PropertyGroup
-from bpy.props import CollectionProperty, IntProperty
-from .input_target import RBFDriverInputTarget
+from ctypes import Union
+from typing import Any, Dict, List, Optional, TYPE_CHECKING
+from bpy.types import ID, Object, PropertyGroup
+from bpy.props import CollectionProperty, EnumProperty, StringProperty, PointerProperty
+from .mixins import Collection, Searchable, Symmetrical
+from ..app.events import dataclass, dispatch_event, Event
+from ..app.utils import owner_resolve
+if TYPE_CHECKING:
+    from bpy.types import Context
+    from .input_variables import InputVariable
+    from .inputs import Input
 
-class RBFDriverInputTargets(PropertyGroup):
+INPUT_TARGET_ROTATION_MODE_ITEMS = [
+    ('AUTO'         , "Auto Euler"       , "Euler using the rotation order of the target"                                  ),
+    ('XYZ'          , "XYZ Euler"        , "Euler using the XYZ rotation order"                                            ),
+    ('XZY'          , "XZY Euler"        , "Euler using the XZY rotation order"                                            ),
+    ('YXZ'          , "YXZ Euler"        , "Euler using the YXZ rotation order"                                            ),
+    ('YZX'          , "YZX Euler"        , "Euler using the YZX rotation order"                                            ),
+    ('ZXY'          , "ZXY Euler"        , "Euler using the ZXY rotation order"                                            ),
+    ('ZYX'          , "ZYX Euler"        , "Euler using the ZYX rotation order"                                            ),
+    ('QUATERNION'   , "Quaternion"       , "Quaternion rotation"                                                           ),
+    ('SWING_TWIST_X', "Swing and X Twist", "Decompose into a swing rotation to aim the X axis, followed by twist around it"),
+    ('SWING_TWIST_Y', "Swing and Y Twist", "Decompose into a swing rotation to aim the Y axis, followed by twist around it"),
+    ('SWING_TWIST_Z', "Swing and Z Twist", "Decompose into a swing rotation to aim the Z axis, followed by twist around it"),
+    ]
 
-    collection__internal__: CollectionProperty(
-        type=RBFDriverInputTarget,
-        options={'HIDDEN'}
+INPUT_TARGET_ROTATION_MODE_INDEX = [
+    _item[0] for _item in INPUT_TARGET_ROTATION_MODE_ITEMS
+    ]
+
+INPUT_TARGET_ROTATION_MODE_TABLE = {
+    _item[0]: _index for _index, _item in enumerate(INPUT_TARGET_ROTATION_MODE_ITEMS)
+    }
+
+INPUT_TARGET_ID_TYPE_ITEMS = [
+    ('OBJECT'     , "Object"  , "", 'OBJECT_DATA',                0),
+    ('MESH'       , "Mesh"    , "", 'MESH_DATA',                  1),
+    ('CURVE'      , "Curve"   , "", 'CURVE_DATA',                 2),
+    ('SURFACE'    , "Surface" , "", 'SURFACE_DATA',               3),
+    ('META'       , "Metaball", "", 'META_DATA',                  4),
+    ('FONT'       , "Font"    , "", 'FONT_DATA',                  5),
+    ('HAIR'       , "Hair"    , "", 'HAIR_DATA',                  6),
+    ('POINTCLOUD' , "Point"   , "", 'POINTCLOUD_DATA',            7),
+    ('VOLUME'     , "Volume"  , "", 'VOLUME_DATA',                8),
+    ('GPENCIL'    , "GPencil" , "", 'OUTLINER_DATA_GREASEPENCIL', 9),
+    ('ARMATURE'   , "Armature", "", 'ARMATURE_DATA',              10),
+    ('LATTICE'    , "Lattice" , "", 'LATTICE_DATA',               11),
+    ('EMPTY'      , "Empty"   , "", 'EMPTY_DATA',                 12),
+    ('LIGHT'      , "Light"   , "", 'LIGHT_DATA',                 13),
+    ('LIGHT_PROBE', "Light"   , "", 'OUTLINER_DATA_LIGHTPROBE',   14),
+    ('CAMERA'     , "Camera"  , "", 'CAMERA_DATA',                15),
+    ('SPEAKER'    , "Speaker" , "", 'OUTLINER_DATA_SPEAKER',      16),
+    ('KEY'        , "Key"     , "", 'SHAPEKEY_DATA',              17),
+]
+
+INPUT_TARGET_ID_TYPE_INDEX: List[str] = [
+    item[1] for item in INPUT_TARGET_ID_TYPE_ITEMS
+    ]
+
+INPUT_TARGET_ID_TYPE_TABLE: Dict[str, int] = {
+    item[0]: item[4] for item in INPUT_TARGET_ID_TYPE_ITEMS
+    }
+
+INPUT_TARGET_TRANSFORM_SPACE_ITEMS = [
+    ('WORLD_SPACE'    , "World Space"    , "Transforms include effects of parenting/restpose and constraints"    ),
+    ('TRANSFORM_SPACE', "Transform Space", "Transforms don't include parenting/restpose or constraints"          ),
+    ('LOCAL_SPACE'    , "Local Space"    , "Transforms include effects of constraints but not parenting/restpose"),
+    ]
+
+INPUT_TARGET_TRANSFORM_SPACE_INDEX = [
+    _item[0] for _item in INPUT_TARGET_TRANSFORM_SPACE_ITEMS
+    ]
+
+INPUT_TARGET_TRANSFORM_SPACE_TABLE = {
+    _item[0]: _index for _index, _item in enumerate(INPUT_TARGET_TRANSFORM_SPACE_ITEMS)
+    }
+
+INPUT_TARGET_TRANSFORM_TYPE_ITEMS = [
+    ('LOC_X'  , "X Location", ""),
+    ('LOC_Y'  , "Y Location", ""),
+    ('LOC_Z'  , "Z Location", ""),
+    ('ROT_W'  , "W Rotation", ""),
+    ('ROT_X'  , "X Rotation", ""),
+    ('ROT_Y'  , "Y Rotation", ""),
+    ('ROT_Z'  , "Z Rotation", ""),
+    ('SCALE_X', "X Scale"   , ""),
+    ('SCALE_Y', "Y Scale"   , ""),
+    ('SCALE_Z', "Z Scale"   , ""),
+    ]
+
+INPUT_TARGET_TRANSFORM_TYPE_INDEX = [
+    _item[0] for _item in INPUT_TARGET_TRANSFORM_TYPE_ITEMS
+    ]
+
+INPUT_TARGET_TRANSFORM_TYPE_TABLE = {
+    _item[0]: _index for _index, _item in enumerate(INPUT_TARGET_TRANSFORM_TYPE_ITEMS)
+    }
+
+
+@dataclass(frozen=True)
+class InputTargetPropertyUpdateEvent(Event):
+    target: 'InputTarget'
+    value: Any
+
+
+@dataclass(frozen=True)
+class InputTargetBoneTargetUpdateEvent(InputTargetPropertyUpdateEvent):
+    value: str
+
+
+@dataclass(frozen=True)
+class InputTargetDataPathUpdateEvent(InputTargetPropertyUpdateEvent):
+    value: str
+
+
+@dataclass(frozen=True)
+class InputTargetIDTypeUpdateEvent(InputTargetPropertyUpdateEvent):
+    value: str
+
+
+@dataclass(frozen=True)
+class InputTargetObjectUpdateEvent(InputTargetPropertyUpdateEvent):
+    value: Optional[Object]
+
+
+@dataclass(frozen=True)
+class InputTargetRotationModeUpdateEvent(InputTargetPropertyUpdateEvent):
+    value: str
+
+
+@dataclass(frozen=True)
+class InputTargetTransformSpaceUpdateEvent(InputTargetPropertyUpdateEvent):
+    value: str
+
+
+@dataclass(frozen=True)
+class InputTargetTransformTypeUpdateEvent(InputTargetPropertyUpdateEvent):
+    value: str
+
+
+def input_target_bone_target(target: 'InputTarget') -> str:
+    return target.get("bone_target", "")
+
+
+def input_target_bone_target_set(target: 'InputTarget', value: str) -> None:
+    input: 'Input' = owner_resolve(target, ".variables")
+
+    if input.type in {'LOCATION', 'ROTATION', 'SCALE'}:
+        raise RuntimeError((f'{target}.bone_target is not writable for {input} '
+                            f'with type {input.type}. Use Input.bone_target.'))
+
+    target["bone_target"] = value
+    dispatch_event(InputTargetBoneTargetUpdateEvent(target, value))
+
+
+def input_target_data_path(target: 'InputTarget') -> str:
+    return target.get("data_path", "")
+
+
+def input_target_data_path_set(target: 'InputTarget', value: str) -> None:
+    input: 'Input' = owner_resolve(target, ".variables")
+
+    if input.type != 'USER_DEF':
+        raise RuntimeError((f'{target}.data_path is not writable '
+                            f'for {input} with type {input.type}'))
+
+    target["data_path"] = value
+    dispatch_event(InputTargetDataPathUpdateEvent(target, value))
+
+
+def input_target_id_type(target: 'InputTarget') -> int:
+    return target.get("id_type", 0)
+
+
+def input_target_id_type_set(target: 'InputTarget', value: int) -> None:
+    input: 'Input' = owner_resolve(target, ".variables")
+
+    if input.type != 'USER_DEF':
+        raise RuntimeError((f'{target}.id_type is not writable '
+                            f'for {input} because {input} type is {input.type}'))
+
+    target["id_type"] = value
+    dispatch_event(InputTargetIDTypeUpdateEvent(target, target.id_type))
+
+
+def input_target_object_update_handler(target: 'InputTarget', _: 'Context') -> None:
+    dispatch_event(InputTargetObjectUpdateEvent(target, target.object))
+
+
+def input_target_rotation_mode_update_handler(target: 'InputTarget', _: 'Context') -> None:
+    dispatch_event(InputTargetObjectUpdateEvent(target, target.object))
+
+
+def input_target_transform_space(target: 'InputTarget') -> int:
+    return target.get('transform_space', INPUT_TARGET_TRANSFORM_SPACE_INDEX[0])
+
+
+def input_target_transform_space_set(target: 'InputTarget', value: int) -> None:
+    input: 'Input' = owner_resolve(target, ".variables")
+
+    if input.type in {'LOCATION', 'ROTATION', 'SCALE'}:
+        raise RuntimeError((f'{target}.transform_space is not writable for {input} '
+                            f'with type {input.type}. Use Input.transform_space.'))
+
+    target["transform_space"] = value
+    dispatch_event(InputTargetTransformSpaceUpdateEvent(target, target.transform_space))
+
+
+def input_target_transform_type(target: 'InputTarget') -> int:
+    return target.get("transform_type", 0)
+
+
+def input_target_transform_type_set(target: 'InputTarget', value: int) -> None:
+    input: 'Input' = owner_resolve(target, ".variables")
+
+    if input.type in {'LOCATION', 'ROTATION', 'SCALE'}:
+        raise RuntimeError((f'{target}.transform_type is not writable '
+                            f'for {input} because {input} type is {input.type}'))
+
+    target["transform_type"] = value
+    dispatch_event(InputTargetTransformTypeUpdateEvent(target, target.transform_type))
+
+
+class InputTarget(Symmetrical, PropertyGroup):
+
+    bone_target: StringProperty(
+        name="Bone",
+        description="The pose bone to target",
+        get=input_target_bone_target,
+        set=input_target_bone_target_set,
+        options=set(),
         )
 
-    length__internal__: IntProperty(
-        get=lambda self: self.get("length__internal__", 0),
-        options=set()
+    data_path: StringProperty(
+        name="Path",
+        description="The path to the target property",
+        get=input_target_data_path,
+        set=input_target_data_path_set,
+        options=set(),
         )
 
-    def __contains__(self, target: Any) -> bool:
-        return any([item == target for item in self])
+    id_type: EnumProperty(
+        name="Type",
+        description="The type of ID to target",
+        items=INPUT_TARGET_ID_TYPE_ITEMS,
+        get=input_target_id_type,
+        set=input_target_id_type_set,
+        options=set(),
+        )
 
-    def __len__(self) -> int:
-        return self.length__internal__
+    @property
+    def id(self) -> Optional[ID]:
+        """The target's ID data-block"""
+        object = self.object
+        if object is None or self.id_type == 'OBJECT': return object
+        if object.type == self.id_type: return object.data
 
-    def __iter__(self) -> Iterator[RBFDriverInputTarget]:
-        for index in range(len(self)):
-            yield self.collection__internal__[index]
+    @property
+    def input(self) -> 'Input':
+        path: str = self.path_from_id()
+        return self.id_data.path_resolve(path.rpartition(".variables")[0])
 
-    def __getitem__(self, key: Union[int, slice]) -> Union[RBFDriverInputTarget, List[RBFDriverInputTarget]]:
-        return self.collection__internal__[key]
+    object: PointerProperty(
+        name="Object",
+        description="The target object",
+        type=Object,
+        poll=lambda self, object: self.id_type in (object.type, 'OBJECT'),
+        options=set(),
+        update=input_target_object_update_handler
+        )
 
-    def __repr__(self) -> str:
-        return f'{self.__class__.__name__}'
+    rotation_mode: EnumProperty(
+        name="Rotation",
+        description="The rotation mode for the input target data",
+        items=INPUT_TARGET_ROTATION_MODE_ITEMS,
+        default=INPUT_TARGET_ROTATION_MODE_ITEMS[0][0],
+        options=set(),
+        update=input_target_rotation_mode_update_handler
+        )
+
+    transform_space: EnumProperty(
+        name="Space",
+        description="The space for transform channels",
+        items=INPUT_TARGET_TRANSFORM_SPACE_ITEMS,
+        get=input_target_transform_space,
+        set=input_target_transform_space_set,
+        options=set(),
+        )
+
+    transform_type: EnumProperty(
+        name="Type",
+        description="The transform channel to target",
+        items=INPUT_TARGET_TRANSFORM_TYPE_ITEMS,
+        get=input_target_transform_type,
+        set=input_target_transform_type_set,
+        options=set(),
+        )
+
+    @property
+    def variable(self) -> 'InputVariable':
+        path: str = self.path_from_id()
+        return self.id_data.path_resolve(path.rpartition(".targets")[0])
 
     def __str__(self) -> str:
         path: str = self.path_from_id()
-        path = path.replace(".collection__internal__", "")
+        path = path.replace(".internal__", "")
         return f'{self.__class__.__name__} @ bpy.data.objects["{self.id_data.name}"].{path}'
 
-    def search(self, identifier: str) -> Optional[RBFDriverInputTarget]:
-        return next((target for target in self.collection__internal__ if target.identifier == identifier), None)
+
+class InputTargets(Searchable[InputTarget], Collection[InputTarget], PropertyGroup):
+
+    internal__: CollectionProperty(
+        type=InputTarget,
+        options={'HIDDEN'}
+        )
+
+    @property
+    def input(self) -> 'Input':
+        path: str = self.path_from_id()
+        return self.id_data.path_resolve(path.rpartition(".variables")[0])
+
+    def __getitem__(self, key: Union[int, slice]) -> Union[InputTarget, List[InputTarget]]:
+        return self.internal__[key]
+
+    def __str__(self) -> str:
+        path: str = self.path_from_id()
+        path = path.replace(".internal__", "")
+        return f'{self.__class__.__name__} @ bpy.data.objects["{self.id_data.name}"].{path}'

@@ -69,7 +69,7 @@ class RBFDRIVERS_PT_drivers(GUIUtils, Panel):
             row = layout.row()
             col = row.column()
             col.template_list(RBFDRIVERS_UL_drivers.bl_idname, "",
-                              drivers, "collection__internal__", drivers, "active_index")
+                              drivers, "internal__", drivers, "active_index")
             
             col = row.column(align=True)
             col.operator_menu_enum(RBFDRIVERS_OT_new.bl_idname, "type", text="", icon='ADD')

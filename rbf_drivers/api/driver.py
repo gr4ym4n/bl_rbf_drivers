@@ -1,15 +1,16 @@
 
 from typing import TYPE_CHECKING, Optional
-from bpy.types import PropertyGroup
+from bpy.types import NodeTree, PropertyGroup
 from bpy.props import BoolProperty, EnumProperty, PointerProperty, StringProperty
 from .mixins import Symmetrical
-from .inputs import RBFDriverInputs
-from .poses import RBFDriverPoses
+from .inputs import Inputs
+from .poses import Poses
 from .outputs import RBFDriverOutputs
 from .driver_interpolation import RBFDriverInterpolation
 from ..app.events import dataclass, dispatch_event, Event
 if TYPE_CHECKING:
     from bpy.types import Context
+    from .poses import Poses
 
 
 DRIVER_TYPE_ITEMS = [
@@ -51,6 +52,11 @@ def driver_type(driver: 'RBFDriver') -> int:
 class RBFDriver(Symmetrical, PropertyGroup):
     '''Radial basis function driver'''
 
+    nodetree_internal__: PointerProperty(
+        type=NodeTree,
+        options={'HIDDEN'}
+        )
+
     @property
     def icon(self) -> str:
         """The RBF driver icon (read-only)"""
@@ -66,7 +72,7 @@ class RBFDriver(Symmetrical, PropertyGroup):
     inputs: PointerProperty(
         name="Inputs",
         description="Collection of RBF driver inputs",
-        type=RBFDriverInputs,
+        type=Inputs,
         options=set()
         )
 
@@ -87,7 +93,7 @@ class RBFDriver(Symmetrical, PropertyGroup):
     poses: PointerProperty(
         name="Poses",
         description="Collection of RBF driver poses",
-        type=RBFDriverPoses,
+        type=Poses,
         options=set()
         )
 
@@ -126,5 +132,5 @@ class RBFDriver(Symmetrical, PropertyGroup):
 
     def __str__(self) -> str:
         path: str = self.path_from_id()
-        path = path.replace(".collection__internal__", "")
+        path = path.replace(".internal__", "")
         return f'{self.__class__.__name__} @ bpy.data.objects["{self.id_data.name}"].{path}'

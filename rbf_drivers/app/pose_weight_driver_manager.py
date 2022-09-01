@@ -37,11 +37,11 @@ from ..api.drivers import DriverDisposableEvent
 from ..lib.driver_utils import driver_ensure, driver_variables_clear, DriverVariableNameGenerator
 if TYPE_CHECKING:
     from bpy.types import Driver, DriverTarget, DriverVariable, FCurve
-    from ..api.input_target import RBFDriverInputTarget
-    from ..api.input_variable_data import RBFDriverInputVariableData
-    from ..api.input_variable import RBFDriverInputVariable
-    from ..api.input import RBFDriverInput
-    from ..api.pose import RBFDriverPose
+    from ..api.input_target import InputTarget
+    from ..api.input_data import InputData
+    from ..api.input_variable import InputVariable
+    from ..api.input import Input
+    from ..api.pose import Pose
     from ..api.driver import RBFDriver
 
 log = getLogger("rbf_drivers")
@@ -76,7 +76,7 @@ def distance_direction(a: Sequence[float], b: Sequence[float], axis: str) -> flo
     return (asin((sum(ai * bi for ai, bi in zip(a, b)))) - -(pi / 2.0)) / pi
 
 
-def input_distance_metric(input: 'RBFDriverInput') -> Union[Callable[[Sequence[float], Sequence[float]], float],
+def input_distance_metric(input: 'Input') -> Union[Callable[[Sequence[float], Sequence[float]], float],
                                                             Callable[[Sequence[float], Sequence[float], str], float]]:
     type = input.type
 
@@ -88,7 +88,7 @@ def input_distance_metric(input: 'RBFDriverInput') -> Union[Callable[[Sequence[f
 
     return distance_euclidean
 
-def input_distance_matrix(input: 'RBFDriverInput') -> np.ndarray:
+def input_distance_matrix(input: 'Input') -> np.ndarray:
     active = filter(input_variable_is_enabled, input.variables)
     params = np.array([tuple(v.data.values(v.data.is_normalized)) for v in active], dtype=float).T
     matrix = np.empty((len(params), len(params)), dtype=float)
@@ -107,13 +107,13 @@ def input_pose_radii(matrix: np.ndarray) -> Iterator[float]:
         yield 0.0 if len(row) == 0 else np.min(row)
 
 
-def tgt_assign__prop(tgt: 'DriverTarget', src: 'RBFDriverInputTarget') -> None:
+def tgt_assign__prop(tgt: 'DriverTarget', src: 'InputTarget') -> None:
     tgt.id_type = src.id_type
     tgt.id = src.id
     tgt.data_path = src.data_path
 
 
-def tgt_assign__xform(tgt: 'DriverTarget', src: 'RBFDriverInputTarget') -> None:
+def tgt_assign__xform(tgt: 'DriverTarget', src: 'InputTarget') -> None:
     tgt.id = src.object
     tgt.bone_target = src.bone_target
     tgt.transform_type = src.transform_type
@@ -121,13 +121,13 @@ def tgt_assign__xform(tgt: 'DriverTarget', src: 'RBFDriverInputTarget') -> None:
     tgt.rotation_mode = src.rotation_mode
 
 
-def tgt_assign__diff(tgt: 'DriverTarget', src: 'RBFDriverInputTarget') -> None:
+def tgt_assign__diff(tgt: 'DriverTarget', src: 'InputTarget') -> None:
     tgt.id = src.object
     tgt.bone_target = src.bone_target
     tgt.transform_space = src.transform_space
 
 
-def tgt_assign(var: 'DriverVariable', src: 'RBFDriverInputVariable') -> None:
+def tgt_assign(var: 'DriverVariable', src: 'InputVariable') -> None:
     type = var.type
     if type == 'SINGLE_PROP':
         return tgt_assign__prop(var.targets[0], src.targets[0])
@@ -189,7 +189,7 @@ def ipw_dist_metric__twist(driver: 'Driver', tokens: Sequence[Tuple[str, str]]) 
     driver.expression = f'fabs({tokens[0][0]}-{str(tokens[0][1])})/pi'
 
 
-def ipw_dist_metric(fcurve: 'FCurve', input: 'RBFDriverInput', index: int) -> None:
+def ipw_dist_metric(fcurve: 'FCurve', input: 'Input', index: int) -> None:
     keygen = DriverVariableNameGenerator()
     tokens = []
 
@@ -203,7 +203,7 @@ def ipw_dist_metric(fcurve: 'FCurve', input: 'RBFDriverInput', index: int) -> No
         var.name = next(keygen)
         tgt_assign(var, src)
 
-        data: 'RBFDriverInputVariableData' = src.data
+        data: 'InputData' = src.data
         try:
             val = data.value(index, data.is_normalized)
         except IndexError:
@@ -231,7 +231,7 @@ def ipw_dist_metric(fcurve: 'FCurve', input: 'RBFDriverInput', index: int) -> No
         ipw_dist_metric__euclidean(dr, tokens)
 
 
-def ipw_dist_weight(fc: 'FCurve', pose: 'RBFDriverPose', rad: float) -> None:
+def ipw_dist_weight(fc: 'FCurve', pose: 'Pose', rad: float) -> None:
     dr = fc.driver
 
     var = dr.variables.new()
@@ -509,7 +509,7 @@ def on_input_variable_is_enabled_update(event: InputVariableIsEnabledUpdateEvent
 
 @event_handler(InputVariableNameUpdateEvent)
 def on_input_variable_name_update(event: InputVariableNameUpdateEvent) -> None:
-    input: 'RBFDriverInput' = owner_resolve(event.variable, ".variables")
+    input: 'Input' = owner_resolve(event.variable, ".variables")
     if input.type == 'SHAPE_KEY':
         pose_weight_drivers_update(owner_resolve(input, ".inputs"))
 

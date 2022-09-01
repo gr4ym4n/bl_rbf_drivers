@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING
 from bpy.types import Menu, Panel, UIList
 from .drivers import RBFDRIVERS_PT_drivers
 from .utils import GUILayerUtils
-from ..api.input import INPUT_TYPE_ICONS
+from ..api.inputs import INPUT_TYPE_ICONS
 from ..ops.input import (RBFDRIVERS_OT_input_add, RBFDRIVERS_OT_input_decompose,
                          RBFDRIVERS_OT_input_remove,
                          RBFDRIVERS_OT_input_move_up,
@@ -12,8 +12,8 @@ from ..ops.input import (RBFDRIVERS_OT_input_add, RBFDRIVERS_OT_input_decompose,
                          RBFDRIVERS_OT_input_variable_remove)
 if TYPE_CHECKING:
     from bpy.types import Context, UILayout
-    from ..api.input_variable import RBFDriverInputVariable
-    from ..api.input import RBFDriverInput
+    from ..api.input_variables import InputVariable
+    from ..api.inputs import Input
 
 
 class RBFDRIVERS_UL_inputs(UIList):
@@ -21,7 +21,7 @@ class RBFDRIVERS_UL_inputs(UIList):
 
     def draw_item(self, _0,
                   layout: 'UILayout', _1,
-                  input: 'RBFDriverInput', _2, _3, _4) -> None:
+                  input: 'Input', _2, _3, _4) -> None:
 
         layout.prop(input, "name",
                     text="",
@@ -77,7 +77,7 @@ class RBFDRIVERS_PT_inputs(GUILayerUtils, Panel):
         row = layout.row()
         column = row.column()
         column.template_list(RBFDRIVERS_UL_inputs.bl_idname, "",
-                             inputs, "collection__internal__",
+                             inputs, "internal__",
                              inputs, "active_index")
 
         column = row.column(align=True)
@@ -99,7 +99,7 @@ class RBFDRIVERS_PT_inputs(GUILayerUtils, Panel):
                 layout.separator()
                 self.draw_variables(layout, context)
 
-    def draw_location(self, layout: 'UILayout', context: 'Context', input: 'RBFDriverInput') -> None:
+    def draw_location(self, layout: 'UILayout', context: 'Context', input: 'Input') -> None:
         self.draw_transform_target(layout, context, input)
 
         layout.separator(factor=0.5)
@@ -116,7 +116,7 @@ class RBFDRIVERS_PT_inputs(GUILayerUtils, Panel):
         for variable in input.variables:
             row.prop(variable, "is_enabled", text=variable.name, toggle=True)
 
-    def draw_rotation(self, layout: 'UILayout', context: 'Context', input: 'RBFDriverInput') -> None:
+    def draw_rotation(self, layout: 'UILayout', context: 'Context', input: 'Input') -> None:
         self.draw_transform_target(layout, context, input)
         layout.separator(factor=0.5)
         column, decorations = self.split_layout(layout, "Channels", decorate_fill=False)
@@ -146,7 +146,7 @@ class RBFDRIVERS_PT_inputs(GUILayerUtils, Panel):
             for variable in input.variables[1:]:
                 subrow.prop(variable, "is_enabled", text=variable.name, toggle=True)
 
-    def draw_scale(self, layout: 'UILayout', context: 'Context', input: 'RBFDriverInput') -> None:
+    def draw_scale(self, layout: 'UILayout', context: 'Context', input: 'Input') -> None:
         self.draw_transform_target(layout, context, input)
 
         layout.separator(factor=0.5)
@@ -158,20 +158,20 @@ class RBFDRIVERS_PT_inputs(GUILayerUtils, Panel):
         for variable in input.variables:
             row.prop(variable, "is_enabled", text=variable.name, toggle=True)
 
-    def draw_rotation_diff(self, layout: 'UILayout', context: 'Context', input: 'RBFDriverInput') -> None:
+    def draw_rotation_diff(self, layout: 'UILayout', context: 'Context', input: 'Input') -> None:
         for suffix, target in zip("AB", input.variables[0].targets):
             self.draw_transform_target(layout, context, target, f'Target {suffix}')
             if suffix == 'A':
                 layout.separator(factor=0.5)
 
-    def draw_loc_diff(self, layout: 'UILayout', context: 'Context', input: 'RBFDriverInput') -> None:
+    def draw_loc_diff(self, layout: 'UILayout', context: 'Context', input: 'Input') -> None:
         for suffix, target in zip("AB", input.variables[0].targets):
             self.draw_transform_target(layout, context, target, f'Target {suffix}')
             self.split_layout(layout, " ").prop(target, "transform_space", text="")
             if suffix == 'A':
                 layout.separator(factor=0.5)
 
-    def draw_shape_key(self, layout: 'UILayout', context: 'Context', input: 'RBFDriverInput') -> None:
+    def draw_shape_key(self, layout: 'UILayout', context: 'Context', input: 'Input') -> None:
         labels, values, decorations = self.split_layout(layout, decorate_fill=False)
 
         labels.label(text="Object")
@@ -204,7 +204,7 @@ class RBFDRIVERS_PT_inputs(GUILayerUtils, Panel):
             row.operator(RBFDRIVERS_OT_input_variable_remove.bl_idname, text="", icon='X').index = index
             decorations.prop(variable, "is_enabled", text="")
 
-    def draw_user_def(self, layout: 'UILayout', context: 'Context', input: 'RBFDriverInput') -> None:
+    def draw_user_def(self, layout: 'UILayout', context: 'Context', input: 'Input') -> None:
         labels, values, decorations = self.split_layout(layout, decorate_fill=False)
 
         labels.label(text="Type")
@@ -266,7 +266,7 @@ class RBFDRIVERS_PT_inputs(GUILayerUtils, Panel):
     def draw_variable_detail(self,
                              layout: 'UILayout',
                              context: 'Context',
-                             variable: 'RBFDriverInputVariable') -> None:
+                             variable: 'InputVariable') -> None:
 
         if variable.type == 'TRANSFORMS':
             target = variable.targets[0]

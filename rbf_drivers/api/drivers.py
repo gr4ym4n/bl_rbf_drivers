@@ -41,7 +41,7 @@ class RBFDrivers(Reorderable,
         index = self.active_index
         return self[index] if index < len(self) else None
 
-    collection__internal__: CollectionProperty(
+    internal__: CollectionProperty(
         type=RBFDriver,
         options={'HIDDEN'}
         )
@@ -83,7 +83,7 @@ class RBFDrivers(Reorderable,
             raise ValueError((f'{self.__class__.__name__}.new(name="", type="GENERIC", mirror=None): '
                               f'type "{type}" is only valid for mesh, lattice and curve objects.'))
 
-        driver = self.collection__internal__.add()
+        driver = self.internal__.add()
         driver.__init__(type=type, name=name, mirror=mirror)
 
         dispatch_event(DriverNewEvent(driver))
@@ -105,7 +105,7 @@ class RBFDrivers(Reorderable,
 
         dispatch_event(DriverDisposableEvent(driver))
 
-        self.collection__internal__.remove(index)
+        self.internal__.remove(index)
         self.active_index = min(self.active_index, len(self)-1)
 
         dispatch_event(DriverRemovedEvent(self, index))

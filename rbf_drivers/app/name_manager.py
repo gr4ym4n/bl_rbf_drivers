@@ -3,22 +3,22 @@ from typing import TYPE_CHECKING, Dict, Iterable, List, Optional, Sequence
 from logging import getLogger
 from .events import event_handler
 from .utils import owner_resolve
-from ..api.input_target import InputTargetBoneTargetUpdateEvent, InputTargetObjectUpdateEvent
+from ..api.input_targets import InputTargetBoneTargetUpdateEvent, InputTargetObjectUpdateEvent
 from ..api.input_variables import InputVariableNewEvent
-from ..api.input import InputBoneTargetUpdateEvent, InputNameUpdateEvent, InputObjectUpdateEvent
+from ..api.inputs import InputBoneTargetUpdateEvent, InputNameUpdateEvent, InputObjectUpdateEvent
 from ..api.inputs import InputNewEvent
-from ..api.pose import PoseNameUpdateEvent
-from ..api.output_channel import OutputChannelNameChangeEvent
+from ..api.poses import PoseNameUpdateEvent
+from ..api.output_channels import OutputChannelNameChangeEvent
 from ..api.output import OutputBoneTargetChangeEvent, OutputNameUpdateEvent, OutputObjectChangeEvent
 from ..api.outputs import OutputNewEvent
 from ..api.driver import DriverNameUpdateEvent
 from ..api.drivers import DriverNewEvent
 if TYPE_CHECKING:
     from bpy.types import PropertyGroup
-    from ..api.input_target import RBFDriverInputTarget
-    from ..api.input_variables import RBFDriverInputVariables
-    from ..api.input import RBFDriverInput
-    from ..api.output import RBFDriverOutput
+    from ..api.input_targets import InputTarget
+    from ..api.input_variables import InputVariables
+    from ..api.inputs import Input
+    from ..api.output import Output
     from ..api.driver import RBFDriver
 
 log = getLogger(__name__)
@@ -58,7 +58,7 @@ def uniqname(value: str,
     return k
 
 
-def difftarget(target: 'RBFDriverInputTarget') -> str:
+def difftarget(target: 'InputTarget') -> str:
     object = target.object
     if object is None:
         return "?"
@@ -67,7 +67,7 @@ def difftarget(target: 'RBFDriverInputTarget') -> str:
     return object.name
 
 
-def inputname(input: 'RBFDriverInput') -> str:
+def inputname(input: 'Input') -> str:
     type = input.type
 
     if type in {'LOCATION', 'ROTATION', 'SCALE'}:
@@ -97,7 +97,7 @@ def inputname(input: 'RBFDriverInput') -> str:
     return result
 
 
-def outputname(output: 'RBFDriverOutput') -> str:
+def outputname(output: 'Output') -> str:
     type = output.type
 
     if type in {'LOCATION', 'ROTATION', 'SCALE'}:
@@ -220,7 +220,7 @@ def on_input_bone_target_update(event: InputBoneTargetUpdateEvent) -> None:
 
 @event_handler(InputTargetObjectUpdateEvent)
 def on_input_target_object_update(event: InputTargetObjectUpdateEvent) -> None:
-    input: 'RBFDriverInput' = owner_resolve(event.target, ".variables")
+    input: 'Input' = owner_resolve(event.target, ".variables")
     if input.type.endswith('DIFF') and not input.name_is_user_defined:
         value = inputname(input)
 
@@ -231,7 +231,7 @@ def on_input_target_object_update(event: InputTargetObjectUpdateEvent) -> None:
 
 @event_handler(InputTargetBoneTargetUpdateEvent)
 def on_input_target_bone_target_update(event: InputTargetBoneTargetUpdateEvent) -> None:
-    input: 'RBFDriverInput' = owner_resolve(event.target, ".variables")
+    input: 'Input' = owner_resolve(event.target, ".variables")
     if input.type.endswith('DIFF') and not input.name_is_user_defined:
         value = inputname(input)
         log.debug((f'Assigning auto-generated name "{value}" '
@@ -243,7 +243,7 @@ def on_input_target_bone_target_update(event: InputTargetBoneTargetUpdateEvent) 
 def on_input_variable_new(event: InputVariableNewEvent) -> None:
     variable = event.variable
     if not variable.name:
-        variables: 'RBFDriverInputVariables' = owner_resolve(variable, ".")
+        variables: 'InputVariables' = owner_resolve(variable, ".")
 
         value = "var"
         value = uniqname(value, siblings(variable, variables), separator="_", zfill=2)
@@ -336,7 +336,7 @@ def on_output_name_update(event: OutputNameUpdateEvent) -> None:
 
 @event_handler(OutputChannelNameChangeEvent)
 def on_output_channel_name_change(event: OutputChannelNameChangeEvent) -> None:
-    output: 'RBFDriverOutput' = owner_resolve(event.channel, ".channels")
+    output: 'Output' = owner_resolve(event.channel, ".channels")
 
     if output.type == 'SHAPE_KEY' and not output.name_is_user_defined:
         value = outputname(output)

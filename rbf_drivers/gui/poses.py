@@ -11,15 +11,15 @@ from ..ops.pose import (RBFDRIVERS_OT_pose_add,
                         RBFDRIVERS_OT_pose_move_down)
 if TYPE_CHECKING:
     from bpy.types import Context, UILayout
-    from ..api.input_variable import RBFDriverInputVariable
-    from ..api.input import RBFDriverInput
-    from ..api.output_channel import RBFDriverOutputChannel
-    from ..api.output import RBFDriverOutput
-    from ..api.pose import RBFDriverPose
+    from ..api.input_variables import InputVariable
+    from ..api.inputs import Input
+    from ..api.output_channels import OutputChannel
+    from ..api.output import Output
+    from ..api.poses import Pose
     from ..api.driver import RBFDriver
 
-IOLayer = TypeVar("IOLayer", 'RBFDriverInput', 'RBFDriverOutput')
-IOChannel = TypeVar("IOChannel", 'RBFDriverInputVariable', 'RBFDriverOutputChannel')
+IOLayer = TypeVar("IOLayer", 'Input', 'Output')
+IOChannel = TypeVar("IOChannel", 'InputVariable', 'OutputChannel')
 
 
 class RBFDRIVERS_UL_poses(UIList):
@@ -28,7 +28,7 @@ class RBFDRIVERS_UL_poses(UIList):
     def draw_item(self,
                   context: 'Context',
                   layout: 'UILayout', _0,
-                  pose: 'RBFDriverPose',
+                  pose: 'Pose',
                   icon: str, _1, _2,
                   index: int, _3) -> None:
 
@@ -110,7 +110,7 @@ class RBFDRIVERS_PT_poses(GUIUtils, Panel):
         row = layout.row()
         col = row.column()
         col.template_list(RBFDRIVERS_UL_poses.bl_idname, "",
-                          poses, "collection__internal__", poses, "active_index", rows=6)
+                          poses, "internal__", poses, "active_index", rows=6)
 
         ops = row.column(align=True)
         ops.operator(RBFDRIVERS_OT_pose_add.bl_idname, text="", icon='ADD')
@@ -125,7 +125,7 @@ class RBFDRIVERS_PT_poses(GUIUtils, Panel):
         if pose:
             self.draw_pose_settings(layout, driver, pose, poses.active_index)
 
-    def draw_pose_settings(self, layout: 'UILayout', driver: 'RBFDriver', pose: 'RBFDriverPose', pose_index: int) -> None:
+    def draw_pose_settings(self, layout: 'UILayout', driver: 'RBFDriver', pose: 'Pose', pose_index: int) -> None:
 
         layout.separator()
         column = self.split_layout(layout, " ")

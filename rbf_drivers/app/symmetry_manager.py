@@ -11,19 +11,19 @@ from .events import event_handler
 from ..lib import rotation_utils
 from ..lib.symmetry import symmetrical_target
 from ..api.mixins import Symmetrical
-from ..api.input_target import (InputTargetBoneTargetUpdateEvent,
+from ..api.input_targets import (InputTargetBoneTargetUpdateEvent,
                                 InputTargetDataPathUpdateEvent,
                                 InputTargetObjectUpdateEvent,
                                 InputTargetRotationModeUpdateEvent,
                                 InputTargetTransformSpaceUpdateEvent,
                                 InputTargetTransformTypeUpdateEvent)
-from ..api.input_variable_data_sample import InputVariableDataSampleUpdateEvent
-from ..api.input_variable_data import InputVariableDataUpdateEvent, RBFDriverInputVariableData
-from ..api.input_variable import (InputVariableIsEnabledUpdateEvent,
+from ..api.input_sample import InputSampleUpdateEvent
+from ..api.input_data import InputDataUpdateEvent, InputData
+from ..api.input_variables import (InputVariableIsEnabledUpdateEvent,
                                   InputVariableNameUpdateEvent,
                                   InputVariableTypeUpdateEvent)
 from ..api.input_variables import InputVariableDisposableEvent, InputVariableNewEvent
-from ..api.input import (InputBoneTargetUpdateEvent,
+from ..api.inputs import (InputBoneTargetUpdateEvent,
                          InputNameUpdateEvent,
                          InputDataTypeUpdateEvent,
                          InputObjectUpdateEvent,
@@ -35,8 +35,8 @@ from ..api.input import (InputBoneTargetUpdateEvent,
 from ..api.inputs import InputDisposableEvent, InputNewEvent, InputMoveEvent
 from ..api.pose_interpolation import PoseInterpolationUpdateEvent
 from ..api.poses import PoseNewEvent, PoseDisposableEvent
-from ..api.output_channel_data_sample import OutputChannelDataSampleUpdateEvent
-from ..api.output_channel import OutputChannelMuteUpdateEvent
+from ..api.output_data import OutputSampleUpdateEvent
+from ..api.output_channels import OutputChannelMuteUpdateEvent
 from ..api.output import (OutputBoneTargetChangeEvent,
                           OutputDataPathChangeEvent,
                           OutputIDTypeUpdateEvent,
@@ -52,17 +52,17 @@ from ..app.output_channel_driver_manager import output_activate, output_assign_c
 from ..app.pose_weight_driver_manager import pose_weight_drivers_update
 from ..app.property_manager import output_idprops_create, pose_idprops_create
 if TYPE_CHECKING:
-    from ..api.input_target import RBFDriverInputTarget
-    from ..api.input_variable_data_sample import RBFDriverInputVariableDataSample
-    from ..api.input_variable import RBFDriverInputVariable
-    from ..api.input import RBFDriverInput
-    from ..api.inputs import RBFDriverInputs
+    from ..api.input_targets import InputTarget
+    from ..api.input_sample import InputSample
+    from ..api.input_variables import InputVariable
+    from ..api.inputs import Input
+    from ..api.inputs import Inputs
     from ..api.pose_interpolation import RBFDriverPoseInterpolation
-    from ..api.pose import RBFDriverPose
-    from ..api.output_channel_data_sample import RBFDriverOutputChannelDataSample
-    from ..api.output_channel_data import RBFDriverOutputChannelData
-    from ..api.output_channel import RBFDriverOutputChannel
-    from ..api.output import RBFDriverOutput
+    from ..api.poses import Pose
+    from ..api.output_data import OutputSample
+    from ..api.output_channel_data import OutputData
+    from ..api.output_channels import OutputChannel
+    from ..api.output import Output
     from ..api.driver_interpolation import RBFDriverInterpolation
     from ..api.driver import RBFDriver
 
@@ -134,9 +134,9 @@ def get_interpolation_curve_options(manager: Union['RBFDriverInterpolation',
 #region Input Symmetry Utilties
 ###################################################################################################
 
-def resolve_input_target_mirror(target: 'RBFDriverInputTarget') -> Tuple['RBFDriver', 'RBFDriverInputTarget']:
+def resolve_input_target_mirror(target: 'InputTarget') -> Tuple['RBFDriver', 'InputTarget']:
 
-    variable: 'RBFDriverInputVariable' = owner_resolve(target, ".targets")
+    variable: 'InputVariable' = owner_resolve(target, ".targets")
     if not variable.has_symmetry_target:
         raise SymmetryError(f'Symmetry target defined for {target} but not for {variable}')
 
@@ -149,9 +149,9 @@ def resolve_input_target_mirror(target: 'RBFDriverInputTarget') -> Tuple['RBFDri
     return m_driver, m_target
 
 
-def resolve_input_variable_mirror(variable: 'RBFDriverInputVariable') -> Tuple['RBFDriver', 'RBFDriverInputVariable']:
+def resolve_input_variable_mirror(variable: 'InputVariable') -> Tuple['RBFDriver', 'InputVariable']:
 
-    input: 'RBFDriverInput' = owner_resolve(variable, ".variables")
+    input: 'Input' = owner_resolve(variable, ".variables")
     if not input.has_symmetry_target:
         raise SymmetryError(f'Symmetry target defined for {variable} but not for {input}')
 
@@ -164,7 +164,7 @@ def resolve_input_variable_mirror(variable: 'RBFDriverInputVariable') -> Tuple['
     return m_driver, m_variable
 
 
-def resolve_input_mirror(input: 'RBFDriverInput') -> Tuple['RBFDriver', 'RBFDriverInput']:
+def resolve_input_mirror(input: 'Input') -> Tuple['RBFDriver', 'Input']:
 
     driver: 'RBFDriver' = owner_resolve(input, ".inputs")
     if not driver.has_symmetry_target:
@@ -183,9 +183,9 @@ def resolve_input_mirror(input: 'RBFDriverInput') -> Tuple['RBFDriver', 'RBFDriv
 #region Output Symmetry Utilities
 ###################################################################################################
 
-def resolve_output_channel_mirror(channel: 'RBFDriverOutputChannel') -> Tuple['RBFDriver', 'RBFDriverOutputChannel']:
+def resolve_output_channel_mirror(channel: 'OutputChannel') -> Tuple['RBFDriver', 'OutputChannel']:
 
-    output: 'RBFDriverInput' = owner_resolve(channel, ".channels")
+    output: 'Input' = owner_resolve(channel, ".channels")
     if not output.has_symmetry_target:
         raise SymmetryError(f'Symmetry target defined for {channel} but not for {output}')
 
@@ -198,7 +198,7 @@ def resolve_output_channel_mirror(channel: 'RBFDriverOutputChannel') -> Tuple['R
     return m_driver, m_channel
 
 
-def resolve_output_mirror(output: 'RBFDriverOutput') -> Tuple['RBFDriver', 'RBFDriverOutput']:
+def resolve_output_mirror(output: 'Output') -> Tuple['RBFDriver', 'Output']:
     
     driver: 'RBFDriver' = owner_resolve(output, ".outputs")
     if not driver.has_symmetry_target:
@@ -217,7 +217,7 @@ def resolve_output_mirror(output: 'RBFDriverOutput') -> Tuple['RBFDriver', 'RBFD
 #region Pose Symmetry Utilities
 ###################################################################################################
 
-def resolve_pose_mirror(pose: 'RBFDriverPose') -> Tuple['RBFDriver', 'RBFDriverPose']:
+def resolve_pose_mirror(pose: 'Pose') -> Tuple['RBFDriver', 'Pose']:
 
     driver: 'RBFDriver' = owner_resolve(pose, ".poses")
     if not driver.has_symmetry_target:
@@ -257,7 +257,7 @@ def pose_interpolation_clone(symsrc: 'RBFDriverPoseInterpolation', symtgt: 'RBFD
     symtgt.__init__(**get_interpolation_curve_options(symsrc))
 
 
-def input_target_clone(symsrc: 'RBFDriverInputTarget', symtgt: 'RBFDriverInputTarget') -> None:
+def input_target_clone(symsrc: 'InputTarget', symtgt: 'InputTarget') -> None:
     set_symmetry_target(symsrc, symtgt)
 
     for propname in ("id_type", "rotation_mode", "transform_space", "transform_type"):
@@ -283,30 +283,30 @@ def input_target_clone(symsrc: 'RBFDriverInputTarget', symtgt: 'RBFDriverInputTa
         symtgt["bone_target"] = symmetrical_datapath(value)
 
 
-def input_targets_clone(symsrc: 'RBFDriverInputs', symtgt: 'RBFDriverInputs') -> None:
+def input_targets_clone(symsrc: 'Inputs', symtgt: 'Inputs') -> None:
     symtgt["length__internal__"] = symsrc["length__internal__"]
-    for target in symsrc.collection__internal__:
-        input_target_clone(target, symtgt.collection__internal__.add())
+    for target in symsrc.internal__:
+        input_target_clone(target, symtgt.internal__.add())
 
 
-def input_variable_data_sample_clone(symsrc: 'RBFDriverInputVariableDataSample', symtgt: 'RBFDriverInputVariableDataSample') -> None:
+def input_variable_data_sample_clone(symsrc: 'InputSample', symtgt: 'InputSample') -> None:
     symtgt["index"] = symsrc.index
     symtgt["value"] = symsrc.value
     if symsrc.is_property_set("value_normalized"):
         symtgt["value_normalized"] = symsrc.value_normalized
 
 
-def input_variable_data_clone(symsrc: 'RBFDriverInputVariableData', symtgt: 'RBFDriverInputVariableData') -> None:
+def input_variable_data_clone(symsrc: 'InputData', symtgt: 'InputData') -> None:
     for propname in ("is_normalized", "norm"):
         if symsrc.is_property_set(propname):
             symtgt[propname] = symsrc[propname]
 
     for sample in symsrc.samples:
-        input_variable_data_sample_clone(sample, symtgt.data__internal__.add())
+        input_variable_data_sample_clone(sample, symtgt.internal__.add())
 
 
-def input_variable_clone(symsrc: 'RBFDriverInputVariable',
-                         symtgt: 'RBFDriverInputVariable',
+def input_variable_clone(symsrc: 'InputVariable',
+                         symtgt: 'InputVariable',
                          is_key: Optional[bool]=False) -> None:
     set_symmetry_target(symtgt, symsrc)
 
@@ -324,7 +324,7 @@ def input_variable_clone(symsrc: 'RBFDriverInputVariable',
     input_variable_data_clone(symsrc.data, symtgt.data)
 
 
-def input_clone(symsrc: 'RBFDriverInput', symtgt: 'RBFDriverInput') -> None:
+def input_clone(symsrc: 'Input', symtgt: 'Input') -> None:
     set_symmetry_target(symtgt, symsrc)
 
     for propname in ("type",
@@ -357,7 +357,7 @@ def input_clone(symsrc: 'RBFDriverInput', symtgt: 'RBFDriverInput') -> None:
     is_key = symsrc.type == 'SHAPE_KEY'
 
     for variable in symsrc.variables:
-        input_variable_clone(variable, symtgt.variables.collection__internal__.add(), is_key)
+        input_variable_clone(variable, symtgt.variables.internal__.add(), is_key)
 
     if symtgt.type == 'LOCATION' and symtgt.use_mirror_x:
         for sample in symtgt.variables[0].data:
@@ -392,17 +392,17 @@ def input_clone(symsrc: 'RBFDriverInput', symtgt: 'RBFDriverInput') -> None:
             variable.data.__init__(values)
 
 
-def output_channel_data_sample_clone(symsrc: 'RBFDriverOutputChannelDataSample', symtgt: 'RBFDriverOutputChannelDataSample') -> None:
+def output_channel_data_sample_clone(symsrc: 'OutputSample', symtgt: 'OutputSample') -> None:
     symtgt["index"] = symsrc.index
     symtgt["value"] = symsrc.value
 
 
-def output_channel_data_clone(symsrc: 'RBFDriverOutputChannelData', symtgt: 'RBFDriverOutputChannelData') -> None:
+def output_channel_data_clone(symsrc: 'OutputData', symtgt: 'OutputData') -> None:
     for sample in symsrc.samples:
-        output_channel_data_sample_clone(sample, symtgt.data__internal__.add())
+        output_channel_data_sample_clone(sample, symtgt.internal__.add())
 
 
-def output_channel_clone(symsrc: 'RBFDriverOutputChannel', symtgt: 'RBFDriverOutputChannel', name: Optional[str]="") -> None:
+def output_channel_clone(symsrc: 'OutputChannel', symtgt: 'OutputChannel', name: Optional[str]="") -> None:
     set_symmetry_target(symtgt, symsrc)
 
     symtgt["name"] = name or symsrc.name
@@ -413,7 +413,7 @@ def output_channel_clone(symsrc: 'RBFDriverOutputChannel', symtgt: 'RBFDriverOut
     output_channel_data_clone(symsrc.data, symtgt.data)
 
 
-def output_clone(symsrc: 'RBFDriverOutput', symtgt: 'RBFDriverOutput') -> None:
+def output_clone(symsrc: 'Output', symtgt: 'Output') -> None:
     output_idprops_create(symtgt)
     set_symmetry_target(symsrc, symtgt)
 
@@ -452,10 +452,10 @@ def output_clone(symsrc: 'RBFDriverOutput', symtgt: 'RBFDriverOutput') -> None:
         name = symsrc.name
         name = symmetrical_target(name) or name
         symtgt["name"] = name
-        output_channel_clone(symsrc.channels[0], symtgt.channels.collection__internal__.add(), name=name)
+        output_channel_clone(symsrc.channels[0], symtgt.channels.internal__.add(), name=name)
     else:
         for channel in symsrc.channels:
-            output_channel_clone(channel, symtgt.channels.collection__internal__.add())
+            output_channel_clone(channel, symtgt.channels.internal__.add())
 
     if symtgt.type == 'LOCATION' and symtgt.use_mirror_x:
         for sample in symtgt.channels[0].data:
@@ -489,7 +489,7 @@ def output_clone(symsrc: 'RBFDriverOutput', symtgt: 'RBFDriverOutput') -> None:
     output_assign_channel_data_targets(symtgt)
 
 
-def pose_clone(symsrc: 'RBFDriverPose', symtgt: 'RBFDriverPose') -> None:
+def pose_clone(symsrc: 'Pose', symtgt: 'Pose') -> None:
     pose_idprops_create(symtgt)
     set_symmetry_target(symsrc, symtgt)
     pose_interpolation_clone(symsrc.interpolation, symtgt.interpolation)
@@ -501,17 +501,17 @@ def driver_clone(symsrc: 'RBFDriver', symtgt: 'RBFDriver') -> None:
     driver_interpolation_clone(symsrc.interpolation, symtgt.interpolation)
 
     for input in symsrc.inputs:
-        input_clone(input, symtgt.inputs.collection__internal__.add())
+        input_clone(input, symtgt.inputs.internal__.add())
 
     symtgt.inputs.active_index = symsrc.inputs.active_index
 
     for output in symsrc.outputs:
-        output_clone(output, symtgt.outputs.collection__internal__.add())
+        output_clone(output, symtgt.outputs.internal__.add())
 
     symtgt.outputs.active_index = symsrc.outputs.active_index
 
     for pose in symsrc.poses:
-        pose_clone(pose, symtgt.poses.collection__internal__.add())
+        pose_clone(pose, symtgt.poses.internal__.add())
 
     symtgt.poses.active_index = symsrc.poses.active_index
 
@@ -617,13 +617,13 @@ def on_input_target_transform_type_update(event: InputTargetTransformTypeUpdateE
 #region Input Variable Event Handlers
 ###################################################################################################
 
-@event_handler(InputVariableDataSampleUpdateEvent)
-def on_input_variable_data_sample_update(event: InputVariableDataSampleUpdateEvent) -> None:
-    variable: RBFDriverInputVariable = owner_resolve(event.sample, ".data.")
+@event_handler(InputSampleUpdateEvent)
+def on_input_variable_data_sample_update(event: InputSampleUpdateEvent) -> None:
+    variable: InputVariable = owner_resolve(event.sample, ".data.")
     if variable.has_symmetry_target:
 
         index = event.sample.index
-        input: 'RBFDriverInput' = owner_resolve(variable, ".variables")
+        input: 'Input' = owner_resolve(variable, ".variables")
         
         if input.type == 'ROTATION' and input.use_mirror_x:
             try:
@@ -645,7 +645,7 @@ def on_input_variable_data_sample_update(event: InputVariableDataSampleUpdateEve
                 elif mode == 'TWIST': data = rotation_utils.quaternion_to_swing_twist(data, input.rotation_axis, True)
 
                 for variable, value in zip(mirror.variables, data):
-                    data: 'RBFDriverInputVariableData' = variable.data
+                    data: 'InputData' = variable.data
                     data[index]["value"] = value
                     data.update(propagate=False)
                 
@@ -667,9 +667,9 @@ def on_input_variable_data_sample_update(event: InputVariableDataSampleUpdateEve
             set_attribute(driver, mirror.data[index], "value", value)
 
 
-@event_handler(InputVariableDataUpdateEvent)
-def on_input_variable_data_update(event: InputVariableDataUpdateEvent) -> None:
-    variable: RBFDriverInputVariable = owner_resolve(event.data, ".")
+@event_handler(InputDataUpdateEvent)
+def on_input_variable_data_update(event: InputDataUpdateEvent) -> None:
+    variable: InputVariable = owner_resolve(event.data, ".")
     if variable.has_symmetry_target:
         try:
             driver, mirror = resolve_input_variable_mirror(variable)
@@ -727,7 +727,7 @@ def on_input_variable_type_update(event: InputVariableTypeUpdateEvent) -> None:
 
 @event_handler(InputVariableNewEvent)
 def on_input_variable_new(event: InputVariableNewEvent) -> None:
-    input: RBFDriverInput = owner_resolve(event.variable, ".variables")
+    input: Input = owner_resolve(event.variable, ".variables")
     if input.has_symmetry_target:
         try:
             driver, mirror = resolve_input_mirror(input)
@@ -768,11 +768,11 @@ def on_input_new(event: InputNewEvent) -> None:
         except SymmetryError as error:
             log.error(error.message)
         else:
-            input: 'RBFDriverInput' = call_method(mirror, mirror.inputs, "new", event.input.type)
+            input: 'Input' = call_method(mirror, mirror.inputs, "new", event.input.type)
             set_symmetry_target(event.input, input)
             for symsrc, symtgt in zip(event.input.variables, input.variables):
                 set_symmetry_target(symsrc, symtgt)
-                for symsrc, symtgt in zip(symsrc.targets.collection__internal__, symtgt.targets.collection__internal__):
+                for symsrc, symtgt in zip(symsrc.targets.internal__, symtgt.targets.internal__):
                     set_symmetry_target(symsrc, symtgt)
 
 
@@ -786,7 +786,7 @@ def on_input_move(event: InputMoveEvent) -> None:
         except SymmetryError as error:
             log.error(error.message)
         else:
-            inputs: 'RBFDriverInputs' = driver.inputs
+            inputs: 'Inputs' = driver.inputs
             call_method(driver, inputs, "move", inputs.index(mirror), event.to_index)
 
 
@@ -973,7 +973,7 @@ def on_pose_disposable(event: PoseDisposableEvent) -> None:
 
 @event_handler(PoseInterpolationUpdateEvent)
 def on_pose_interpolation_update(event: PoseInterpolationUpdateEvent) -> None:
-    pose: 'RBFDriverPose' = owner_resolve(event.interpolation, ".")
+    pose: 'Pose' = owner_resolve(event.interpolation, ".")
     if pose.has_symmetry_target:
         try:
             driver, mirror = resolve_pose_mirror(pose)
@@ -990,12 +990,12 @@ def on_pose_interpolation_update(event: PoseInterpolationUpdateEvent) -> None:
 #region Output Channel Event Handlers
 ###################################################################################################
 
-@event_handler(OutputChannelDataSampleUpdateEvent)
-def on_output_channel_data_sample_update(event: OutputChannelDataSampleUpdateEvent) -> None:
-    channel: 'RBFDriverOutputChannel' = owner_resolve(event.sample, ".data.")
+@event_handler(OutputSampleUpdateEvent)
+def on_output_channel_data_sample_update(event: OutputSampleUpdateEvent) -> None:
+    channel: 'OutputChannel' = owner_resolve(event.sample, ".data.")
     if channel.has_symmetry_target:
         index = event.sample.index
-        output: 'RBFDriverOutput' = owner_resolve(channel, ".channels")
+        output: 'Output' = owner_resolve(channel, ".channels")
 
         if output.type == 'ROTATION' and output.use_mirror_x:
             try:

@@ -2,15 +2,14 @@
 from typing import Set, TYPE_CHECKING
 from bpy.types import Operator
 from bpy.props import CollectionProperty, EnumProperty, IntProperty
-from ..api.input import INPUT_DATA_TYPE_TABLE, INPUT_TYPE_ITEMS, INPUT_TYPE_TABLE
+from ..api.inputs import INPUT_DATA_TYPE_TABLE, INPUT_TYPE_ITEMS, INPUT_TYPE_TABLE
 from ..api.selection_item import RBFDriverSelectionItem
-from ..app.pose_weight_driver_manager import pose_weight_drivers_update
 from ..gui.generic import RBFDRIVERS_UL_selection_list
 if TYPE_CHECKING:
     from bpy.types import Context, Event
-    from ..api.input_variables import RBFDriverInputVariables
-    from ..api.input import RBFDriverInput
-    from ..api.inputs import RBFDriverInputs
+    from ..api.input_variables import InputVariables
+    from ..api.inputs import Input
+    from ..api.inputs import Inputs
     from ..api.driver import RBFDriver
 
 
@@ -36,7 +35,7 @@ class RBFDRIVERS_OT_input_add(Operator):
                 and object.rbf_drivers.active is not None)
 
     def execute(self, context: 'Context') -> Set[str]:
-        inputs: 'RBFDriverInputs' = context.object.rbf_drivers.active.inputs
+        inputs: 'Inputs' = context.object.rbf_drivers.active.inputs
         inputs.new(self.type)
         return {'FINISHED'}
 
@@ -56,7 +55,7 @@ class RBFDRIVERS_OT_input_remove(Operator):
                 and object.rbf_drivers.active.inputs.active is not None)
 
     def execute(self, context: 'Context') -> Set[str]:
-        inputs: 'RBFDriverInputs' = context.object.rbf_drivers.active.inputs
+        inputs: 'Inputs' = context.object.rbf_drivers.active.inputs
         inputs.remove(inputs.active)
         return {'FINISHED'}
 
@@ -78,11 +77,11 @@ class RBFDRIVERS_OT_input_decompose(Operator):
 
     def execute(self, context: 'Context') -> Set[str]:
         driver: 'RBFDriver' = context.object.rbf_drivers.active
-        input: 'RBFDriverInput' = driver.inputs.active
+        input: 'Input' = driver.inputs.active
         if input.type in {'LOCATION', 'SCALE'}:
             for index, variable in zip((2, 1, 0), reversed(input.variables)):
                 if not variable.is_enabled:
-                    input.variables.collection__internal__.remove(index)
+                    input.variables.internal__.remove(index)
 
         elif input.type == 'ROTATION':
             mode = input.rotation_mode
@@ -90,19 +89,18 @@ class RBFDRIVERS_OT_input_decompose(Operator):
                 input["data_type"] = INPUT_DATA_TYPE_TABLE['ANGLE']
                 for index, variable in zip((3, 2, 1, 0), reversed(input.variables)):
                     if not variable.is_enabled:
-                        input.variables.collection__internal__.remove(index)
+                        input.variables.internal__.remove(index)
             elif mode == 'TWIST':
                 input["data_type"] = INPUT_DATA_TYPE_TABLE['ANGLE']
                 axis = 'WXYZ'.index(mode.rotation_axis)
                 for index in reversed(range(4)):
                     if index != axis:
-                        input.variables.collection__internal__.remove(index)
+                        input.variables.internal__.remove(index)
             else:
                 input["data_type"] = INPUT_DATA_TYPE_TABLE['QUATERNION']
                 input["use_swing"] = mode == 'SWING'
 
         input["type"] = INPUT_TYPE_TABLE['USER_DEF']
-        pose_weight_drivers_update(driver)
         return {'FINISHED'}
 
 
@@ -122,7 +120,7 @@ class RBFDRIVERS_OT_input_move_up(Operator):
                 and object.rbf_drivers.active.inputs.active_index > 0)
 
     def execute(self, context: 'Context') -> Set[str]:
-        inputs: 'RBFDriverInputs' = context.object.rbf_drivers.active.inputs
+        inputs: 'Inputs' = context.object.rbf_drivers.active.inputs
         inputs.move(inputs.active_index, inputs.active_index - 1)
         return {'FINISHED'}
 
@@ -144,7 +142,7 @@ class RBFDRIVERS_OT_input_move_down(Operator):
                 and object.rbf_drivers.active.inputs.active_index < len(object.rbf_drivers.active.inputs) - 1)
 
     def execute(self, context: 'Context') -> Set[str]:
-        inputs: 'RBFDriverInputs' = context.object.rbf_drivers.active.inputs
+        inputs: 'Inputs' = context.object.rbf_drivers.active.inputs
         inputs.move(inputs.active_index, inputs.active_index + 1)
         return {'FINISHED'}
 
@@ -184,7 +182,7 @@ class RBFDRIVERS_OT_input_variable_add(Operator):
         return False
 
     def invoke(self, context: 'Context', event: 'Event') -> Set[str]:
-        input: 'RBFDriverInput' = context.object.rbf_drivers.active.inputs.active
+        input: 'Input' = context.object.rbf_drivers.active.inputs.active
         if input.type == 'SHAPE_KEY':
             object = input.object
             shapes = self.shape_keys
@@ -210,7 +208,7 @@ class RBFDRIVERS_OT_input_variable_add(Operator):
         layout.separator()
 
     def execute(self, context: 'Context') -> Set[str]:
-        input: 'RBFDriverInput' = context.object.rbf_drivers.active.inputs.active
+        input: 'Input' = context.object.rbf_drivers.active.inputs.active
         if input.type == 'SHAPE_KEY':
             for item in self.shape_keys:
                 if item.selected:
@@ -243,7 +241,7 @@ class RBFDRIVERS_OT_input_variable_remove(Operator):
 
     def execute(self, context: 'Context') -> Set[str]:
         index = self.index
-        variables: 'RBFDriverInputVariables' = context.object.rbf_drivers.active.inputs.active.variables
+        variables: 'InputVariables' = context.object.rbf_drivers.active.inputs.active.variables
 
         if index >= len(variables):
             self.report({'ERROR'}, f'Variable index {index} out of range 0-{len(variables)}')

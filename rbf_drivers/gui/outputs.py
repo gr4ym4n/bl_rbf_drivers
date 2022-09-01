@@ -10,13 +10,13 @@ from ..ops.output import (RBFDRIVERS_OT_output_add,
                           RBFDRIVERS_OT_output_move_down)
 if TYPE_CHECKING:
     from bpy.types import Context
-    from ..api.output import RBFDriverOutput
+    from ..api.output import Output
 
 
 class RBFDRIVERS_UL_outputs(UIList):
     bl_idname = 'RBFDRIVERS_UL_outputs'
 
-    def draw_item(self, _0, layout: UILayout, _1, output: 'RBFDriverOutput', _2, _3, _4) -> None:
+    def draw_item(self, _0, layout: UILayout, _1, output: 'Output', _2, _3, _4) -> None:
 
         if output.type == 'SHAPE_KEY':
             layout.label(icon='SHAPEKEY_DATA', text=output.name)
@@ -78,7 +78,7 @@ class RBFDRIVERS_PT_outputs(GUILayerUtils, Panel):
         row = layout.row()
         column = row.column()
         column.template_list(RBFDRIVERS_UL_outputs.bl_idname, "",
-                             outputs, "collection__internal__",
+                             outputs, "internal__",
                              outputs, "active_index")
 
         column = row.column(align=True)
@@ -94,7 +94,7 @@ class RBFDRIVERS_PT_outputs(GUILayerUtils, Panel):
         column.operator(RBFDRIVERS_OT_output_move_up.bl_idname, text="", icon='TRIA_UP')
         column.operator(RBFDRIVERS_OT_output_move_down.bl_idname, text="", icon='TRIA_DOWN')
 
-        output: 'RBFDriverOutput' = outputs.active
+        output: 'Output' = outputs.active
         if output is not None:
             layout.separator()
             
@@ -140,7 +140,7 @@ class RBFDRIVERS_PT_outputs(GUILayerUtils, Panel):
 
             layout.separator()
 
-    def draw_location(self, layout: 'UILayout', context: 'Context', output: 'RBFDriverOutput') -> None:
+    def draw_location(self, layout: 'UILayout', context: 'Context', output: 'Output') -> None:
         self.draw_transform_target(layout, context, output)
         layout.separator(factor=0.5)
 
@@ -156,7 +156,7 @@ class RBFDRIVERS_PT_outputs(GUILayerUtils, Panel):
         row.prop(output, "use_y", text="Y", toggle=True)
         row.prop(output, "use_z", text="Z", toggle=True)
 
-    def draw_rotation(self, layout: 'UILayout', context: 'Context', output: 'RBFDriverOutput') -> None:
+    def draw_rotation(self, layout: 'UILayout', context: 'Context', output: 'Output') -> None:
         self.draw_transform_target(layout, context, output)
         layout.separator(factor=0.5)
         column, decorations = self.split_layout(layout, "Channels", decorate_fill=False)
@@ -178,7 +178,7 @@ class RBFDRIVERS_PT_outputs(GUILayerUtils, Panel):
             row.prop(output, "use_y", text="Y", toggle=True)
             row.prop(output, "use_z", text="Z", toggle=True)
 
-    def draw_scale(self, layout: 'UILayout', context: 'Context', output: 'RBFDriverOutput') -> None:
+    def draw_scale(self, layout: 'UILayout', context: 'Context', output: 'Output') -> None:
         self.draw_transform_target(layout, context, output)
         layout.separator(factor=0.5)
 
@@ -188,7 +188,7 @@ class RBFDRIVERS_PT_outputs(GUILayerUtils, Panel):
         row.prop(output, "use_y", text="Y", toggle=True)
         row.prop(output, "use_z", text="Z", toggle=True)
 
-    def draw_shape_key(self, layout: 'UILayout', context: 'Context', output: 'RBFDriverOutput') -> None:
+    def draw_shape_key(self, layout: 'UILayout', context: 'Context', output: 'Output') -> None:
         column = self.split_layout(layout, "Target")
         column.prop_search(output, "object", context.blend_data, "objects", text="", icon='OBJECT_DATA')
 
@@ -202,7 +202,7 @@ class RBFDRIVERS_PT_outputs(GUILayerUtils, Panel):
             row.alert = True
             column.prop(output.channels[0], "name", text="", icon='SHAPEKEY_DATA')
 
-    def draw_single_prop(self, layout: 'UILayout', context: 'Context', output: 'RBFDriverOutput') -> None:
+    def draw_single_prop(self, layout: 'UILayout', context: 'Context', output: 'Output') -> None:
         row = self.split_layout(layout, "Data").row(align=True)
         row.prop(output, "id_type", text="", icon_only=True)
         column = row.column(align=True)

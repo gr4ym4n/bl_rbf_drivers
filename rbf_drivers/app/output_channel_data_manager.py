@@ -9,7 +9,7 @@ from functools import partial
 import numpy as np
 from .events import event_handler
 from .utils import owner_resolve
-from ..api.pose import PoseUpdateEvent
+from ..api.poses import PoseUpdateEvent
 from ..api.poses import PoseMoveEvent, PoseNewEvent, PoseRemovedEvent
 from ..api.output import (OutputBoneTargetChangeEvent,
                           OutputObjectChangeEvent,
@@ -22,9 +22,9 @@ from ..lib.rotation_utils import (axis_angle_to_euler,
                                   quaternion_to_axis_angle,
                                   quaternion_to_euler)
 if TYPE_CHECKING:
-    from ..api.output_channel_data import RBFDriverOutputChannelData
-    from ..api.output_channel import RBFDriverOutputChannel
-    from ..api.output import RBFDriverOutput
+    from ..api.output_channel_data import OutputData
+    from ..api.output_channels import OutputChannel
+    from ..api.output import Output
 
 
 ROTATION_CONVERSION_LUT = {
@@ -47,19 +47,19 @@ channels = attrgetter("channels")
 data = attrgetter("data")
 
 
-def channel_state(channel: 'RBFDriverOutputChannel') -> Tuple['RBFDriverOutputChannelData', float]:
+def channel_state(channel: 'OutputChannel') -> Tuple['OutputData', float]:
     return channel.data, channel.value
 
 
-def channel_chain(outputs: Iterable['RBFDriverOutput']) -> Iterator['RBFDriverOutputChannel']:
+def channel_chain(outputs: Iterable['Output']) -> Iterator['OutputChannel']:
     return chain(*tuple(map(channels, outputs)))
 
 
-def channel_data_chain(outputs: Iterable['RBFDriverOutput']) -> Iterator['RBFDriverOutputChannelData']:
+def channel_data_chain(outputs: Iterable['Output']) -> Iterator['OutputData']:
     return map(data, channel_chain(outputs))
 
 
-def channel_state_chain(outputs: Iterable['RBFDriverOutput']) -> Iterator[Tuple['RBFDriverOutputChannelData', float]]:
+def channel_state_chain(outputs: Iterable['Output']) -> Iterator[Tuple['OutputData', float]]:
     return map(channel_state, channel_chain(outputs))
 
 
@@ -116,7 +116,7 @@ def on_pose_new(event: PoseNewEvent) -> None:
     '''
     '''
     for data, value in channel_state_chain(owner_resolve(event.pose, ".poses").outputs):
-        data.data__internal__.add().__init__(len(data)-1, value)
+        data.internal__.add().__init__(len(data)-1, value)
 
 
 @event_handler(PoseRemovedEvent)
@@ -124,7 +124,7 @@ def on_pose_removed(event: PoseRemovedEvent) -> None:
     '''
     '''
     for data in channel_data_chain(owner_resolve(event.poses, ".").outputs):
-        data.data__internal__.remove(event.index)
+        data.internal__.remove(event.index)
 
 
 @event_handler(PoseUpdateEvent)
@@ -143,7 +143,7 @@ def on_pose_move(event: PoseMoveEvent) -> None:
     '''
     a, b = event.from_index, event.to_index
     for data in channel_data_chain(owner_resolve(event.pose, ".poses").outputs):
-        data.data__internal__.move(a, b)
+        data.internal__.move(a, b)
 
 
 @event_handler(DriverNewEvent)

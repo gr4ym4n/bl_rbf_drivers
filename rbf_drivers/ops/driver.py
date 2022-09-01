@@ -11,7 +11,7 @@ from ..lib.rotation_utils import (quaternion_to_euler,
                                   quaternion_to_swing_twist_x,
                                   quaternion_to_swing_twist_y,
                                   quaternion_to_swing_twist_z)
-from ..api.input import (INPUT_ROTATION_AXIS_TABLE,
+from ..api.inputs import (INPUT_ROTATION_AXIS_TABLE,
                          INPUT_ROTATION_MODE_TABLE,
                          INPUT_ROTATION_ORDER_TABLE)
 from ..api.driver import DRIVER_TYPE_TABLE
@@ -192,7 +192,7 @@ class RBFDRIVERS_OT_move_up(Operator):
 
     def execute(self, context: 'Context') -> Set[str]:
         drivers = context.object.rbf_drivers
-        drivers.collection__internal__.move(drivers.active_index, drivers.active_index - 1)
+        drivers.internal__.move(drivers.active_index, drivers.active_index - 1)
         drivers.active_index -= 1
         return {'FINISHED'}
 
@@ -215,7 +215,7 @@ class RBFDRIVERS_OT_move_down(Operator):
 
     def execute(self, context: 'Context') -> Set[str]:
         drivers = context.object.rbf_drivers
-        drivers.collection__internal__.move(drivers.active_index, drivers.active_index + 1)
+        drivers.internal__.move(drivers.active_index, drivers.active_index + 1)
         drivers.active_index += 1
         return {'FINISHED'}
 
@@ -371,7 +371,7 @@ class RBFDRIVERS_OT_upgrade(Operator):
                     pose = driver.poses[0]
                     pose["name"] = item.get("name", "Rest")
                 else:
-                    pose = driver.poses.collection__internal__.add()
+                    pose = driver.poses.internal__.add()
                     pose["name"] = item.get("name", "")
                     pose_idprops_create(pose)
                     pose.interpolation.__init__(type='SIGMOID', interpolation='LINEAR')
@@ -611,7 +611,7 @@ class RBFDRIVERS_OT_upgrade(Operator):
 
         for legacy in filter(attrgetter("import_flag"), self.legacy_drivers):
             bone = context.blend_data.objects[legacy.data_target].pose.bones[legacy.bone_target]
-            data = bone.get("rbf_drivers", {}).get("data__internal__", [])
+            data = bone.get("rbf_drivers", {}).get("internal__", [])
             data = list(filterfalse(lambda item: item.get("removed", 0), data))
             if not len(data):
                 try:
