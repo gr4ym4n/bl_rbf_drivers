@@ -23,7 +23,7 @@ from ..api.input_variables import (InputVariableIsEnabledUpdateEvent,
                                   InputVariableNameUpdateEvent,
                                   InputVariableTypeUpdateEvent)
 from ..api.input_variables import InputVariableDisposableEvent, InputVariableNewEvent
-from ..api.inputs import (InputBoneTargetUpdateEvent,
+from ..api.input import (InputBoneTargetUpdateEvent,
                          InputNameUpdateEvent,
                          InputDataTypeUpdateEvent,
                          InputObjectUpdateEvent,
@@ -32,7 +32,7 @@ from ..api.inputs import (InputBoneTargetUpdateEvent,
                          InputTransformSpaceChangeEvent,
                          InputUseMirrorXUpdateEvent,
                          InputUseSwingUpdateEvent)
-from ..api.inputs import InputDisposableEvent, InputNewEvent, InputMoveEvent
+from ..api.input import InputDisposableEvent, InputNewEvent, InputMoveEvent
 from ..api.pose_interpolation import PoseInterpolationUpdateEvent
 from ..api.poses import PoseNewEvent, PoseDisposableEvent
 from ..api.output_data import OutputSampleUpdateEvent
@@ -55,8 +55,8 @@ if TYPE_CHECKING:
     from ..api.input_targets import InputTarget
     from ..api.input_sample import InputSample
     from ..api.input_variables import InputVariable
-    from ..api.inputs import Input
-    from ..api.inputs import Inputs
+    from ..api.input import Input
+    from ..api.input import Inputs
     from ..api.pose_interpolation import RBFDriverPoseInterpolation
     from ..api.poses import Pose
     from ..api.output_data import OutputSample

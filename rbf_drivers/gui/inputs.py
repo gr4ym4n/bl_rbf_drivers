@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING
 from bpy.types import Menu, Panel, UIList
 from .drivers import RBFDRIVERS_PT_drivers
 from .utils import GUILayerUtils
-from ..api.inputs import INPUT_TYPE_ICONS
+from ..api.input import INPUT_TYPE_ICONS
 from ..ops.input import (RBFDRIVERS_OT_input_add, RBFDRIVERS_OT_input_decompose,
                          RBFDRIVERS_OT_input_remove,
                          RBFDRIVERS_OT_input_move_up,
@@ -13,7 +13,7 @@ from ..ops.input import (RBFDRIVERS_OT_input_add, RBFDRIVERS_OT_input_decompose,
 if TYPE_CHECKING:
     from bpy.types import Context, UILayout
     from ..api.input_variables import InputVariable
-    from ..api.inputs import Input
+    from ..api.input import Input
 
 
 class RBFDRIVERS_UL_inputs(UIList):

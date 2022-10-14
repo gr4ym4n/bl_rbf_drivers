@@ -27,223 +27,179 @@ bl_info = {
     "warning": ""
 }
 
-def api_input_layer():
-    from .api.input_targets import InputTarget, InputTargets
-    from .api.input_data import InputSample, InputData
-    from .api.input_variables import InputVariable, InputVariables
-    from .api.input_distance_matrix import InputDistance, InputDistanceMatrix
-    from .api.input_pose_radii import InputPoseRadius, InputPoseRadii
-    
+from nodeitems_utils import NodeCategory, NodeItem
+from . import core, sockets, nodes
 
 
 
-UPDATE_URL = ""
+# class RBFDriverVectorSample(Operator):
+#     bl_idname = 'rbfdriver.vector_sample'
+#     bl_label = "Sample"
+#     bl_options = {'INTERNAL', 'UNDO'}
 
-from .lib.curve_mapping import (BLCMAP_CurvePointProperties,
-                                BLCMAP_CurveProperties,
-                                BLCMAP_CurvePoint,
-                                BLCMAP_CurvePoints,
-                                BLCMAP_Curve,
-                                BLCMAP_OT_curve_copy,
-                                BLCMAP_OT_curve_paste,
-                                BLCMAP_OT_node_ensure,
-                                BCLMAP_OT_curve_point_remove,
-                                BLCMAP_OT_handle_type_set)
+#     node_name: StringProperty()
 
-from .api.selection_item import RBFDriverSelectionItem
-from .api.property_target import RBFDriverPropertyTarget
-from .api.input_targets import InputTarget
-from .api.input_targets import InputTargets
-from .api.input_sample import InputSample
-from .api.input_data import InputData
-from .api.input_variables import InputVariable
-from .api.input_variables import InputVariables
-from .api.inputs import Input
-from .api.inputs import Inputs
-from .api.pose_interpolation import RBFDriverPoseInterpolation
-from .api.poses import Pose
-from .api.poses import Poses
-from .api.output_data import OutputSample
-from .api.output_channel_data import OutputData
-from .api.output_channels import OutputChannel
-from .api.output_channels import RBFDriverOutputChannels
-from .api.output import Output
-from .api.outputs import RBFDriverOutputs
-from .api.driver_interpolation import RBFDriverInterpolation
-from .api.driver import RBFDriver
-from .api.drivers import RBFDrivers
-from .api.preferences import RBFDriverPreferences
+#     @classmethod
+#     def poll(cls, context: 'Context') -> bool:
+#         space = context.space_data
+#         if space is not None:
+#             tree = getattr(space, "node_tree", None)
+#             return tree is not None and tree.bl_idname.startswith('RBFDriver')
+#         return False
 
-from .app import (name_manager,
-                  node_manager,
-                  property_manager,
-                  input_initialization_manager,
-                  input_target_manager,
-                  input_variable_data_manager,
-                  pose_initialization_manager,
-                  pose_weight_driver_manager,
-                  output_initialization_manager,
-                  output_channel_data_manager,
-                  output_channel_driver_manager,
-                  symmetry_manager)
+#     def execute(self, context: 'Context') -> Set[str]:
+#         # TODO requires error checking
+#         tree = context.space_data.node_tree
+#         node = tree.nodes.get(self.node_name)
+#         if node and node.bl_idname == 'RBFDriverNodeVector':
+#             for input_, scalar in zip(node.inputs[1:], node.inputs[0].data()):
+#                 input_["default_value"] = scalar.value
+#         return {'FINISHED'}
 
-from .ops.input import (RBFDRIVERS_OT_input_add,
-                        RBFDRIVERS_OT_input_remove,
-                        RBFDRIVERS_OT_input_decompose,
-                        RBFDRIVERS_OT_input_move_up,
-                        RBFDRIVERS_OT_input_move_down,
-                        RBFDRIVERS_OT_input_variable_add,
-                        RBFDRIVERS_OT_input_variable_remove)
 
-from .ops.output import (RBFDRIVERS_OT_output_add,
-                         RBFDRIVERS_OT_output_remove,
-                         RBFDRIVERS_OT_output_move_up,
-                         RBFDRIVERS_OT_output_move_down)
+# class RBFDriverInputAdd(Operator):
+#     bl_idname = 'rbfdriver.input_add'
+#     bl_label = "Add"
+#     bl_options = {'INTERNAL', 'UNDO'}
 
-from .ops.pose import (RBFDRIVERS_OT_pose_add,
-                       RBFDRIVERS_OT_pose_remove,
-                       RBFDRIVERS_OT_pose_update,
-                       RBFDRIVERS_OT_pose_move_up,
-                       RBFDRIVERS_OT_pose_move_down)
+#     type: EnumProperty(
+#         name="Type",
+#         items=RBFDriverNodeGroupInput.TYPES,
+#         default='LOCATION',
+#         options=set()
+#         )
 
-from .ops.driver import (RBFDRIVERS_OT_new,
-                         RBFDRIVERS_OT_remove,
-                         RBFDRIVERS_OT_symmetrize,
-                         RBFDRIVERS_OT_make_generic,
-                         RBFDRIVERS_OT_move_up,
-                         RBFDRIVERS_OT_move_down,
-                         LegacyDriver,
-                         RBFDRIVERS_OT_upgrade)
+#     @classmethod
+#     def poll(cls, context: 'Context') -> bool:
+#         space = context.space_data
+#         if space is not None:
+#             tree = getattr(space, "node_tree", None)
+#             return tree is not None and tree.bl_idname == 'RBFDriverNodeTreeMain'
+#         return False
 
-from .gui.generic import RBFDRIVERS_UL_selection_list
-from .gui.drivers import (RBFDRIVERS_UL_drivers,
-                          RBFDRIVERS_MT_driver_context_menu,
-                          RBFDRIVERS_PT_drivers,
-                          RBFDRIVERS_PT_interpolation)
-from .gui.inputs import RBFDRIVERS_UL_inputs, RBFDRIVERS_MT_input_context_menu, RBFDRIVERS_PT_inputs
-from .gui.outputs import RBFDRIVERS_UL_outputs, RBFDRIVERS_PT_outputs
-from .gui.poses import RBFDRIVERS_MT_pose_context_menu, RBFDRIVERS_UL_poses, RBFDRIVERS_PT_poses
+#     def execute(self, context: 'Context') -> Set[str]:
+#         tree = context.space_data.node_tree
+#         name = RBFDriverNodeGroupInput.TYPES[self.get("type", 0)[1]]
+#         tree.nodes.new(name, 'RBFDriverNodeGroupInput').type = self.type
+#         return {'FINISHED'}
 
-def classes():
-    return [
-        # lib
-        BLCMAP_CurvePointProperties,
-        BLCMAP_CurveProperties,
-        BLCMAP_CurvePoint,
-        BLCMAP_CurvePoints,
-        BLCMAP_Curve,
-        BLCMAP_OT_curve_copy,
-        BLCMAP_OT_curve_paste,
-        BLCMAP_OT_node_ensure,
-        BCLMAP_OT_curve_point_remove,
-        BLCMAP_OT_handle_type_set,
-        # api
-        RBFDriverSelectionItem,
-        RBFDriverPropertyTarget,
-        InputTarget,
-        InputTargets,
-        InputSample,
-        InputData,
-        InputVariable,
-        InputVariables,
-        Input,
-        Inputs,
-        RBFDriverPoseInterpolation,
-        Pose,
-        Poses,
-        OutputSample,
-        OutputData,
-        OutputChannel,
-        RBFDriverOutputChannels,
-        Output,
-        RBFDriverOutputs,
-        RBFDriverInterpolation,
-        RBFDriver,
-        RBFDrivers,
-        RBFDriverPreferences,
-        # ops
-        RBFDRIVERS_OT_input_add,
-        RBFDRIVERS_OT_input_remove,
-        RBFDRIVERS_OT_input_decompose,
-        RBFDRIVERS_OT_input_move_up,
-        RBFDRIVERS_OT_input_move_down,
-        RBFDRIVERS_OT_input_variable_add,
-        RBFDRIVERS_OT_input_variable_remove,
-        RBFDRIVERS_OT_output_add,
-        RBFDRIVERS_OT_output_remove,
-        RBFDRIVERS_OT_output_move_up,
-        RBFDRIVERS_OT_output_move_down,
-        RBFDRIVERS_OT_pose_add,
-        RBFDRIVERS_OT_pose_remove,
-        RBFDRIVERS_OT_pose_update,
-        RBFDRIVERS_OT_pose_move_up,
-        RBFDRIVERS_OT_pose_move_down,
-        RBFDRIVERS_OT_new,
-        RBFDRIVERS_OT_remove,
-        RBFDRIVERS_OT_symmetrize,
-        RBFDRIVERS_OT_make_generic,
-        RBFDRIVERS_OT_move_up,
-        RBFDRIVERS_OT_move_down,
-        LegacyDriver,
-        RBFDRIVERS_OT_upgrade,
-        # gui
-        RBFDRIVERS_UL_selection_list,
-        RBFDRIVERS_UL_drivers,
-        RBFDRIVERS_MT_driver_context_menu,
-        RBFDRIVERS_PT_drivers,
-        RBFDRIVERS_PT_interpolation,
-        RBFDRIVERS_MT_input_context_menu,
-        RBFDRIVERS_UL_inputs,
-        RBFDRIVERS_PT_inputs,
-        RBFDRIVERS_UL_outputs,
-        RBFDRIVERS_PT_outputs,
-        RBFDRIVERS_MT_pose_context_menu,
-        RBFDRIVERS_UL_poses,
-        RBFDRIVERS_PT_poses,
-        ]
+
+# class RBFDriverInputList(UIList):
+#     bl_idname = 'RBFDRIVER_UL_inputs'
+
+#     def draw_item(self, _0,
+#                   layout: 'UILayout', _1,
+#                   group: RBFDriverNodeGroupInput, _2, _3, _4) -> None:
+#         layout.prop(group, "name", text="", emboss=False, translate=False)
+
+#     def filter_items(self, context: 'Context', tree: RBFDriverNodeTreeMain, _):
+#         flag = self.bitflag_filter_item
+#         mask = ~flag
+#         name = RBFDriverNodeGroupInput.bl_idname
+#         nodes = tree.nodes
+#         flags = [flag if node.bl_idname == name else mask for node in nodes]
+#         order = list(range(len(flags)))
+#         return flags, order
+
+
+# class RBFDriverPoseList(UIList):
+#     bl_idname = 'RBFDRIVER_UL_poses'
+
+#     def draw_item(self, _0,
+#                   layout: 'UILayout', _1,
+#                   node: RBFDriverNodePose, _2, _3, _4) -> None:
+#         layout.prop(node, "name", text="", emboss=False, translate=False)
+
+#     def filter_items(self, context: 'Context', tree: RBFDriverNodeTreeMain, _):
+#         flag = self.bitflag_filter_item
+#         mask = ~flag
+#         name = 'RBFDriverNodePose'
+#         nodes = tree.nodes
+#         flags = [flag if node.bl_idname == name else mask for node in nodes]
+#         order = list(range(len(flags)))
+#         return flags, order
+
+
+# class RBFDriverInputPanel(Panel):
+#     bl_idname = 'RBFDRIVER_PT_input'
+#     bl_space_type = 'NODE_EDITOR'
+#     bl_region_type = 'UI'
+#     bl_category = "Layers"
+#     bl_label = "Inputs"
+
+#     @classmethod
+#     def poll(cls, context: 'Context') -> bool:
+#         space = context.space_data
+#         if space is not None:
+#             tree = getattr(space, "node_tree", None)
+#             return tree is not None and tree.bl_idname == RBFDriverNodeTreeMain.bl_idname
+#         return False
+
+#     def draw(self, context: 'Context') -> None:
+#         tree = context.space_data.node_tree
+#         layout = self.layout
+#         row = layout.row()
+#         row.template_list(RBFDriverInputList.bl_idname, "", tree, "nodes", tree, "input_active_index")
+#         col = row.column(align=True)
+#         col.operator_menu_enum(RBFDriverInputAdd.bl_idname, "type", text="", icon='ADD')
+                
+
+
+class RBFDriverNodeCategoryMain(NodeCategory):
+    @classmethod
+    def poll(cls, ctx):
+        return ctx.space_data.tree_type == 'RBFDriverNodeTreeMain'
+
+
+NODE_CATEGORIES = [
+    RBFDriverNodeCategoryMain('INPUT', "Input", items=[
+        NodeItem('RBFDriverNodeInputLocation', label="Location"),
+        NodeItem('RBFDriverNodeInputRotation', label="Rotation"),
+        NodeItem('RBFDriverNodeInputScale', label="Scale"),
+        NodeItem('RBFDriverNodeInputTransformChannel', label="Transform Channel"),
+        NodeItem('RBFDriverNodeInputLocDiff', label="Distance"),
+        NodeItem('RBFDriverNodeInputRotationDiff', label="Rotational Difference"),
+        NodeItem('RBFDriverNodeInputMapping', label="Input Mapping"),
+    ]),
+    RBFDriverNodeCategoryMain('STRUCT', "Data Structure", items=[
+        NodeItem('RBFDriverNodeArray', label="Array"),
+        NodeItem('RBFDriverNodeArray', label="Location", settings={"subtype": repr('LOCATION')}),
+        NodeItem('RBFDriverNodeArray', label="Euler", settings={"subtype": repr('EULER')}),
+        NodeItem('RBFDriverNodeArray', label="Quaternion", settings={"subtype": repr('QUATERNION')}),
+        NodeItem('RBFDriverNodeArray', label="Axis/Angle", settings={"subtype": repr('AXIS_ANGLE')}),
+        NodeItem('RBFDriverNodeArray', label="Scale", settings={"subtype": repr('SCALE')}),
+        NodeItem('RBFDriverNodeArray', label="RGB Color", settings={"subtype": repr('RGB')}),
+        NodeItem('RBFDriverNodeArray', label="HSV Color", settings={"subtype": repr('HSV')}),
+        NodeItem('RBFDriverNodeMatrix', label="Matrix")
+    ]),
+    RBFDriverNodeCategoryMain('RBF', "RBF", items=[
+        NodeItem('RBFDriverNodePose', label="Pose"),
+        NodeItem('RBFDriverNodePoseGroup', label="Pose Group"),
+    ]),
+    RBFDriverNodeCategoryMain('DISTANCE', "Distance", items=[
+        NodeItem('RBFDriverNodeDistance', label="Distance Euclidean", settings={"function": repr('EUCLIDEAN')}),
+        NodeItem('RBFDriverNodeDistance', label="Distance Angle", settings={"function": repr('ANGLE')}),
+        NodeItem('RBFDriverNodeDistance', label="Distance Quaternion", settings={"function": repr('QUATERNION')}),
+        NodeItem('RBFDriverNodeDistance', label="Distance Swing X", settings={"function": repr('SWING_X')}),
+        NodeItem('RBFDriverNodeDistance', label="Distance Swing Y", settings={"function": repr('SWING_Y')}),
+        NodeItem('RBFDriverNodeDistance', label="Distance Swing Z", settings={"function": repr('SWING_Z')}),
+    ])
+]
+
+CLASSES = core.CLASSES + sockets.CLASSES + nodes.CLASSES
+
 
 def register():
-    from bpy.types import Object
-    from bpy.props import PointerProperty
     from bpy.utils import register_class
-
-    BLCMAP_OT_curve_copy.bl_idname = "rbf_driver.curve_copy"
-    BLCMAP_OT_curve_paste.bl_idname = "rbf_driver.curve_paste"
-    BLCMAP_OT_handle_type_set.bl_idname = "rbf_driver.handle_type_set"
-
-    from .lib import update
-    update.register("rbf_drivers", UPDATE_URL)
-
-    for cls in classes():
+    from nodeitems_utils import register_node_categories
+    for cls in CLASSES:
         register_class(cls)
+    register_node_categories(core.RBFDriverNodeTreeMain.bl_idname, NODE_CATEGORIES)
 
-    Object.rbf_drivers = PointerProperty(
-        name="RBF Drivers",
-        description="Radial Basis Function Drivers",
-        type=RBFDrivers,
-        options={'HIDDEN'}
-        )
 
 def unregister():
-    import sys
-    import operator
-    from bpy.types import Object
     from bpy.utils import unregister_class
-
-    try:
-        del Object.rbf_drivers
-    except: pass
-
-    for cls in reversed(classes()):
+    from nodeitems_utils import unregister_node_categories
+    unregister_node_categories(core.RBFDriverNodeTreeMain.bl_idname)
+    for cls in reversed(CLASSES):
         unregister_class(cls)
-
-    from .lib import update
-    update.unregister()
-
-    modules_ = sys.modules 
-    modules_ = dict(sorted(modules_.items(), key=operator.itemgetter(0)))
-   
-    for name in modules_.keys():
-        if name.startswith(__name__):
-            del sys.modules[name]
-

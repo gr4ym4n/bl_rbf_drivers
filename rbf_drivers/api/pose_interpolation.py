@@ -1,15 +1,17 @@
 
-from typing import Iterable, List, Optional, Sequence, Tuple, TYPE_CHECKING, Union
+from typing import Iterable, List, Optional, Sequence, Tuple, TYPE_CHECKING
 from bpy.types import PropertyGroup
 from bpy.props import (
     BoolProperty,
     CollectionProperty,
     EnumProperty,
+    FloatProperty,
     FloatVectorProperty,
     PointerProperty
     )
 from ..app.events import dataclass, dispatch_event, Event
-from .mixins import BPYPropCollectionInterface, Collection, Identifiable
+from .interfaces import ICollection
+from .mixins import Collection, Identifiable
 if TYPE_CHECKING:
     from .poses import Pose
 
@@ -260,7 +262,7 @@ class PoseInterpolationPoints(Collection[PoseInterpolationPoint], PropertyGroup)
         return self.id_data.path_resolve(path.rpartition(".interpolation")[0])
 
     def __init__(self, data: Iterable[CurvePointInterface]) -> None:
-        points: BPYPropCollectionInterface[PoseInterpolationPoint] = self.internal__
+        points: ICollection[PoseInterpolationPoint] = self.internal__
         points.clear()
         for item in data:
             points.add().__init__(item)
@@ -369,6 +371,10 @@ class PoseInterpolationUpdateEvent(Event):
     interpolation: 'PoseInterpolation'
 
 
+def pose_interpolation_radius_update_handler(interpolation: 'PoseInterpolation', _) -> None:
+    dispatch_event(PoseInterpolationUpdateEvent(interpolation))
+
+
 def pose_interpolation_type_update_handler(interpolation: 'PoseInterpolation', _) -> None:
     type = interpolation.type
     if type != 'CUSTOM':
@@ -417,19 +423,30 @@ class PoseInterpolation(Identifiable, PropertyGroup):
         options=set(),
         )
 
+    points: PointerProperty(
+        name="Points",
+        description="",
+        type=PoseInterpolationPoints,
+        options=set()
+        )
+
+    radius: FloatProperty(
+        name="Radius",
+        description="",
+        min=0.0,
+        soft_min=0.2,
+        soft_max=2.0,
+        default=1.0,
+        options=set(),
+        update=pose_interpolation_radius_update_handler
+        )
+
     type: EnumProperty(
         name="Type",
         items=POSE_INTERPOLATION_TYPE_ITEMS,
         default='LINEAR',
         options=set(),
         update=pose_interpolation_type_update_handler,
-        )
-
-    points: PointerProperty(
-        name="Points",
-        description="",
-        type=PoseInterpolationPoints,
-        options=set()
         )
 
     @property

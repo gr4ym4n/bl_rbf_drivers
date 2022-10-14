@@ -12,7 +12,7 @@ from ..ops.pose import (RBFDRIVERS_OT_pose_add,
 if TYPE_CHECKING:
     from bpy.types import Context, UILayout
     from ..api.input_variables import InputVariable
-    from ..api.inputs import Input
+    from ..api.input import Input
     from ..api.output_channels import OutputChannel
     from ..api.output import Output
     from ..api.poses import Pose

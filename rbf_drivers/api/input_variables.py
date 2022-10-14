@@ -20,7 +20,7 @@ from ..lib.transform_utils import (transform_matrix,
                                    transform_target_rotational_difference)
 if TYPE_CHECKING:
     from .input_targets import InputTarget
-    from .inputs import Input
+    from .input import Input
 
 
 INPUT_VARIABLE_TYPE_ITEMS: List[Tuple[str, str, str, str, int]] = [
@@ -259,6 +259,11 @@ class InputVariable(Symmetrical, PropertyGroup):
         set=input_variable_name_set,
         options=set(),
         )
+
+    @property
+    def norm(self) -> float:
+        data: 'InputData' = self.data
+        return data.norm
 
     targets: PointerProperty(
         name="Targets",

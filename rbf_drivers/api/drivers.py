@@ -2,6 +2,7 @@
 from typing import Optional
 from bpy.types import PropertyGroup
 from bpy.props import CollectionProperty, IntProperty
+from rbf_drivers.api.id_properties import idprop_delete
 from .mixins import Collection, Reorderable, Searchable
 from .driver import RBFDriver, DRIVER_TYPE_TABLE
 from ..app.events import dataclass, dispatch_event, Event
@@ -102,6 +103,11 @@ class RBFDrivers(Reorderable,
         if index == -1:
             raise ValueError((f'{self.__class__.__name__}.remove(driver): '
                               f'driver is not a member of this collection'))
+
+        for input_ in driver.inputs:
+            parameters = input_.parameters
+            for name in parameters.keys():
+                idprop_delete(parameters, name)
 
         dispatch_event(DriverDisposableEvent(driver))
 

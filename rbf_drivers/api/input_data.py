@@ -1,12 +1,13 @@
 
 from typing import Any, Dict, Iterable, Iterator, TYPE_CHECKING
+from numpy.linalg import norm
 from bpy.types import PropertyGroup
 from bpy.props import CollectionProperty, FloatProperty
 from ..app.events import dataclass, throttle_event, Event
 from .mixins import BPYPropCollectionInterface, Collection
 if TYPE_CHECKING:
     from .input_variables import InputVariable
-    from .inputs import Input
+    from .input import Input
 
 #region InputSample
 #--------------------------------------------------------------------------------------------------
@@ -36,6 +37,18 @@ class InputSample(PropertyGroup):
         set=input_sample_value_set,
         options=set()
         )
+
+    @property
+    def data(self) -> 'InputData':
+        return self.variable.data
+
+    @property
+    def norm(self) -> float:
+        return self.data.norm
+
+    @property
+    def index(self) -> int:
+        return self.data.index(self)
 
     @property
     def input(self) -> 'Input':
@@ -81,6 +94,10 @@ class InputData(Collection[InputSample], PropertyGroup):
     def input(self) -> 'Input':
         path: str = self.path_from_id()
         return self.id_data.path_resolve(path.rpartition(".variables")[0])
+
+    @property
+    def norm(self) -> float:
+        return norm(tuple(self.values()))
 
     @property
     def variable(self) -> 'InputVariable':

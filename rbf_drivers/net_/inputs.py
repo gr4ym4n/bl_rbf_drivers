@@ -29,7 +29,7 @@ from ..api.input_variables import (
     InputVariableRemovedEvent,
     InputVariableTypeUpdateEvent
     )
-from ..api.inputs import (
+from ..api.input import (
     InputBoneTargetUpdateEvent,
     InputDisposableEvent,
     InputObjectUpdateEvent,
@@ -44,7 +44,7 @@ if TYPE_CHECKING:
     from bpy.types import FCurve
     from ..api.input_targets import InputTargetPropertyUpdateEvent
     from ..api.input_variables import InputVariablesUpdateEvent, InputVariable
-    from ..api.inputs import Input, InputPropertyUpdateEvent
+    from ..api.input import Input, InputPropertyUpdateEvent
 
 
 class pose_data(DataFrame['Input']):

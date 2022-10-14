@@ -2,14 +2,14 @@
 from typing import Set, TYPE_CHECKING
 from bpy.types import Operator
 from bpy.props import CollectionProperty, EnumProperty, IntProperty
-from ..api.inputs import INPUT_DATA_TYPE_TABLE, INPUT_TYPE_ITEMS, INPUT_TYPE_TABLE
+from ..api.input import INPUT_DATA_TYPE_TABLE, INPUT_TYPE_ITEMS, INPUT_TYPE_TABLE
 from ..api.selection_item import RBFDriverSelectionItem
 from ..gui.generic import RBFDRIVERS_UL_selection_list
 if TYPE_CHECKING:
     from bpy.types import Context, Event
     from ..api.input_variables import InputVariables
-    from ..api.inputs import Input
-    from ..api.inputs import Inputs
+    from ..api.input import Input
+    from ..api.input import Inputs
     from ..api.driver import RBFDriver
 
 

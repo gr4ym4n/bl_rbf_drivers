@@ -1,6 +1,6 @@
 
 from typing import TYPE_CHECKING, Optional, Set, Tuple, Union
-from ..app.utils import DataFrame, idprop_array, idprop_read, idprop_update
+from ..app.utils import DataFrame, idprop_array, idprop_read, idprop_move, idprop_remove, idprop_update
 from .inputs import pose_weights as input_pose_weights
 if TYPE_CHECKING:
     from ..api.driver import RBFDriver
@@ -9,7 +9,7 @@ if TYPE_CHECKING:
 class pose_influences(DataFrame('RBFDriver')):
 
     def __init__(self, driver: 'RBFDriver') -> None:
-        data = idprop_array([1.0] * len(driver.poses), f'driver_{driver.identifier}_poseinfluence')
+        data = idprop_array([1.0] * len(driver.poses), f'driver_{driver.identifier}_poseinfluences')
         vals = idprop_read(self.id, data)
         if vals:
             data["value"] = vals
@@ -17,17 +17,15 @@ class pose_influences(DataFrame('RBFDriver')):
         idprop_update(self.id, data)
 
     def append(self) -> None:
-        pass
+        self.__init__(self.owner)
 
     def move(self, from_index: int, to_index: int) -> None:
-        data = self.data
-        vals = idprop_read(data) or data["value"].tolist()
-        vals.insert(to_index, vals.pop(from_index))
-        data["value"] = vals
-        idprop_update(self.id, data)
+        idprop_move(self.data, from_index, to_index, id=self.id, move_drivers=True)
 
     def remove(self, index: int) -> None:
-        pass
+        vals = idprop_read(self.id, self.data)
+        del vals[index]
+        
 
     def update(self) -> None:
         pass

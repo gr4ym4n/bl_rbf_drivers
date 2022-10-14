@@ -8,7 +8,7 @@ from bpy.props import CollectionProperty, IntProperty, PointerProperty, StringPr
 from .mixins import Observable
 from .inputs import Inputs
 from .poses import Poses
-from ..utils import resolve
+from ..utils_ import resolve
 if TYPE_CHECKING:
     from .inputs import Input
     from .poses import Pose

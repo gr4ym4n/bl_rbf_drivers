@@ -5,8 +5,8 @@ from .events import event_handler
 from .utils import owner_resolve
 from ..api.input_targets import InputTargetBoneTargetUpdateEvent, InputTargetObjectUpdateEvent
 from ..api.input_variables import InputVariableNewEvent
-from ..api.inputs import InputBoneTargetUpdateEvent, InputNameUpdateEvent, InputObjectUpdateEvent
-from ..api.inputs import InputNewEvent
+from ..api.input import InputBoneTargetUpdateEvent, InputNameUpdateEvent, InputObjectUpdateEvent
+from ..api.input import InputNewEvent
 from ..api.poses import PoseNameUpdateEvent
 from ..api.output_channels import OutputChannelNameChangeEvent
 from ..api.output import OutputBoneTargetChangeEvent, OutputNameUpdateEvent, OutputObjectChangeEvent
@@ -17,7 +17,7 @@ if TYPE_CHECKING:
     from bpy.types import PropertyGroup
     from ..api.input_targets import InputTarget
     from ..api.input_variables import InputVariables
-    from ..api.inputs import Input
+    from ..api.input import Input
     from ..api.output import Output
     from ..api.driver import RBFDriver
 

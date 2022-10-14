@@ -18,8 +18,8 @@ from bpy.props import (BoolProperty,
                        IntVectorProperty,
                        PointerProperty,
                        StringProperty)
-from .. import utils
-from ..utils import resolve
+from .. import utils_
+from ..utils_ import resolve
 from .mixins import Observable, Identifiable
 if TYPE_CHECKING:
     from bpy.types import ID, PoseBone
@@ -900,7 +900,7 @@ class InputDistanceMatrix(PropertyGroup):
         values = [v.data.values(v.data.is_normalized) for v in input_.variables if v.enable]
         params = np.array(values, dtype=float).T
         result = np.empty((len(params), len(params)), dtype=float)
-        metric = getattr(utils, f'distance_{input_.distance_metric.lower()}')
+        metric = getattr(utils_, f'distance_{input_.distance_metric.lower()}')
         matrix = input_.distance_matrix
         for a, row in zip(params, result):
             for i, b in enumerate(params):

@@ -6,69 +6,27 @@ from typing import (
     Iterator,
     List,
     Optional,
-    Protocol,
-    Sequence,
     Tuple,
-    TypeVar,
-    Union,
-    TYPE_CHECKING
+    Union
     )
 from uuid import uuid4
+from .interfaces import ICollection, TPropertyGroup
 from bpy.types import PropertyGroup
 from bpy.props import StringProperty
 
-SYMMETRY_MAPPING_AXIS_ITEMS = [
-    ('X', "X", "Map to X axis"),
-    ('Y', "Y", "Map to Y axis"),
-    ('Z', "Z", "Map to Z axis"),
-    None,
-    ('X_NEG', "X (inverted)", "Map to inverted X axis"),
-    ('Y_NEG', "Y (inverted)", "Map to inverted Y axis"),
-    ('Z_NEG', "Z (inverted)", "Map to inverted Z axis"),
-    ]
-
-
-class PropertyGroupInterface:
-    name: str
-    def __getitem__(self, name: str) -> Any: pass
-    def __setitem__(self, name: str, value: Any): pass
-    def is_property_set(self, name: str) -> bool: pass
-    def unset_property(self, name: str) -> None: pass
-
-
-T = TypeVar('T', bound=PropertyGroupInterface)
-
-
-class BPYPropCollectionInterface(Protocol[T]):
-    def __len__(self) -> int: pass
-    def __iter__(self) -> Iterable[T]: pass
-    def __getitem__(self, key: Union[int, str, slice]) -> Union[T, List[T]]: pass
-    def add(self) -> T: pass
-    def find(self, name: str) -> int: pass
-    def clear(self) -> None: pass
-    def foreach_get(self, key: str, data: Sequence[Any]) -> None: pass
-    def foreach_set(self, key: str, data: Sequence[Any]) -> None: pass
-    def get(self, name: str) -> Optional[T]: pass
-    def keys(self) -> Iterable[str]: pass
-    def items(self) -> Iterable[T]: pass
-    def move(self, from_index: int, to_index: int) -> None: pass
-    def remove(self, index: int) -> None: pass
-    def values(self) -> Iterable[T]: pass
-
-
-class Collection(Generic[T]):
+class Collection(Generic[TPropertyGroup]):
 
     @property
-    def internal__(self) -> BPYPropCollectionInterface[T]:
+    def internal__(self) -> ICollection[TPropertyGroup]:
         raise NotImplementedError(f'{self.__class__.__name__}.internal__')
 
     def __len__(self) -> int:
         return len(self.internal__)
 
-    def __iter__(self) -> Iterator[T]:
+    def __iter__(self) -> Iterator[TPropertyGroup]:
         return iter(self.internal__)
 
-    def __getitem__(self, key: Union[int, str, slice]) -> Union[T, List[T]]:
+    def __getitem__(self, key: Union[int, str, slice]) -> Union[TPropertyGroup, List[TPropertyGroup]]:
         if not isinstance(key, (int, str, slice)):
             raise TypeError((f'{self.__class__.__name__}[key]: '
                              f'Expected key to be int, str or slice, not {key.__class__.__name__}'))
@@ -91,7 +49,7 @@ class Collection(Generic[T]):
                              f'Expected name to be str, not {name.__class__.__name__}'))
         return next((member for member in self if member.name == name), default)
 
-    def index(self, item: T) -> int:
+    def index(self, item: TPropertyGroup) -> int:
         '''Return the index of an item in a collection, raising a ValueError when not found.'''
         index = next((index for index, member in enumerate(self) if member == item), -1)
         if index == -1:
@@ -103,12 +61,12 @@ class Collection(Generic[T]):
         '''Return the names of collection members.'''
         return self.internal__.keys()
 
-    def items(self) -> Iterable[Tuple[str, T]]:
+    def items(self) -> Iterable[Tuple[str, TPropertyGroup]]:
         '''Return name value pairs of collection members'''
         return self.internal__.items()
 
 
-class Reorderable(Collection[T]):
+class Reorderable(Collection[TPropertyGroup]):
 
     def move(self, from_index: int, to_index: int) -> None:
 
@@ -131,9 +89,9 @@ class Reorderable(Collection[T]):
         self.internal__.move(from_index, to_index)
 
 
-class Searchable(Generic[T]):
+class Searchable(Generic[TPropertyGroup]):
 
-    def search(self, identifier: str) -> Optional[T]:
+    def search(self, identifier: str) -> Optional[TPropertyGroup]:
 
         if not isinstance(identifier, str):
             raise TypeError((f'{self.__class__.__name__}.search(identifier): '

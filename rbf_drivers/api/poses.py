@@ -9,11 +9,13 @@ from bpy.props import (
     PointerProperty,
     StringProperty
     )
+from rbf_drivers.api.interfaces import ICollection
 from .pose_interpolation import PoseInterpolation
 from .mixins import Collection, Reorderable, Searchable, Symmetrical, IDPropertyController
-from .pose_weight import PoseWeight
-from ..app.events import dataclass, dispatch_event, Event
-from ..app.utils import name_unique, driver_ensure, driver_variables_clear
+from ..app.events import dataclass, dispatch_event, event_handler, Event
+from ..app.utils import name_unique
+from .input import InputRotationAxisUpdateEvent, InputRotationModeUpdateEvent
+from .pose_data import PoseData
 if TYPE_CHECKING:
     from .input_data import InputSample
     from .input_variables import InputVariable
@@ -30,6 +32,7 @@ class PoseInfluence(IDPropertyController, PropertyGroup):
 
     def __init__(self, pose: 'Pose') -> None:
         super().__init__(f'rbf_pose_{pose.identifier}_influence', True, min=0.0, soft_max=1.0)
+
 
 
 @dataclass(frozen=True)
@@ -72,15 +75,13 @@ class Pose(Symmetrical, PropertyGroup):
     def index(self) -> int:
         return self.driver.poses.index(self)
 
+    input_samples: PointerProperty(
+        type=PoseData
+        )
+
     interpolation: PointerProperty(
         name="Interpolation",
         type=PoseInterpolation,
-        options=set()
-        )
-
-    influence: PointerProperty(
-        name="Influence",
-        type=PoseInfluence,
         options=set()
         )
 
@@ -92,6 +93,10 @@ class Pose(Symmetrical, PropertyGroup):
         options=set()
         )
 
+    output_samples: PointerProperty(
+        type=PoseData
+        )
+
     radius: FloatProperty(
         name="Radius",
         description="",
@@ -99,18 +104,9 @@ class Pose(Symmetrical, PropertyGroup):
         update=pose_radius_update_handler
         )
 
-    weight: PointerProperty(
-        name="Weight",
-        type=PoseWeight,
-        options=set()
-        )
-
     def __init__(self, name: str) -> None:
         self["name"] = name
         self.interpolation.__init__()
-        self.influence.__init__(self)
-        self.radius.__init__(self)
-        self.weight.__init__(self)
 
     def __repr__(self) -> str:
         # TODO
@@ -120,6 +116,17 @@ class Pose(Symmetrical, PropertyGroup):
         path: str = self.path_from_id()
         path = path.replace(".internal__", "")
         return f'{self.__class__.__name__} @ bpy.data.objects["{self.id_data.name}"].{path}'
+
+
+
+
+
+            
+
+
+
+
+
 
 
 class SummedPoseWeights(IDPropertyController, PropertyGroup):
@@ -136,7 +143,12 @@ class SummedPoseWeights(IDPropertyController, PropertyGroup):
 
 
 @dataclass(frozen=True)
-class PoseNewEvent(Event):
+class PosesUpdateEvent(Event):
+    poses: 'Poses'
+
+
+@dataclass(frozen=True)
+class PoseNewEvent(PosesUpdateEvent):
     pose: 'Pose'
 
 
@@ -146,8 +158,7 @@ class PoseDisposableEvent(Event):
 
 
 @dataclass(frozen=True)
-class PoseRemovedEvent(Event):
-    poses: 'Poses'
+class PoseRemovedEvent(PosesUpdateEvent):
     index: int
 
 
@@ -244,10 +255,10 @@ class Poses(Reorderable, Searchable[Pose], Collection[Pose], PropertyGroup):
         for input in pose.driver.inputs:
             variable: 'InputVariable'
             for variable in input.variables:
-                sample: 'InputSample' = variable.data.internal__.add()
-                sample.__init__(value=variable.value)
+                data: ICollection['InputSample'] = variable.data.internal__
+                data.add()["value"] = variable.value
 
-        dispatch_event(PoseNewEvent(pose))
+        dispatch_event(PoseNewEvent(self, pose))
 
         self.active_index = len(self) - 1
         return pose

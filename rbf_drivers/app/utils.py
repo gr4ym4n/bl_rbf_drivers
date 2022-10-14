@@ -5,14 +5,11 @@ from math import cos, sin
 from operator import attrgetter
 from string import ascii_letters
 from typing import Any, Dict, Generic, Iterable, Iterator, List, Optional, Sequence, Tuple, TypeVar, Union, TYPE_CHECKING
-import numpy as np
 from mathutils import Euler, Quaternion, Vector
-from bpy.app import timers
-from bpy.types import PropertyGroup
+from bpy.types import PoseBone, PropertyGroup
 from idprop.types import IDPropertyArray
-from ..api.mixins import Identifiable, IDPropertyQuaternionController
-from rna_prop_ui import rna_idprop_ui_create
 if TYPE_CHECKING:
+    from mathutils import Matrix
     from bpy.types import (
         ChannelDriverVariables,
         Driver,
@@ -127,21 +124,6 @@ def update_preferences(preferences: 'RBFDriverPreferences',
         preferences[key] = value
 
 #endregion
-
-#
-#
-
-
-def listattrs(key: str, source: object):
-    return list(map(attrgetter(key), source))
-
-def copyattrs(source: object, target: object, keys: Iterable[str]):
-    for k in keys:
-        setattr(target, k, getattr(source, k))
-
-
-#
-#
 
 
 # region Rotation Utilities
@@ -286,6 +268,48 @@ def swing_twist_z_to_swing_twist_x(value: Union[Tuple[Sequence[float], float], S
 
 def swing_twist_z_to_swing_twist_y(value: Union[Tuple[Sequence[float], float], Sequence[float]]) -> Union[Tuple[Quaternion, float], Quaternion]:
     return quaternion_to_swing_twist_y(swing_twist_z_to_quaternion(value), quaternion=len(value) != 2)
+
+#endregion
+
+#region
+
+def transform_target(object_: Optional['Object'], bone_target: Optional[str]="") -> Optional[Union['Object', 'PoseBone']]:
+    target = object_
+    if target and target.type == 'ARMATURE' and bone_target:
+        target = target.pose.bones.get(bone_target)
+    return target
+
+
+def transform_matrix(target: Union['Object', PoseBone], space: Optional[str]='WORLD_SPACE') -> 'Matrix':
+    if isinstance(target, PoseBone):
+        if space == 'TRANSFORM_SPACE': return target.matrix_channel
+        to_space = space[:5]
+        if to_space in ('LOCAL', 'WORLD'):
+            return target.id_data.convert_space(pose_bone=target, matrix=target.matrix, from_space='POSE', to_space=to_space)
+    else:
+        if space == 'TRANSFORM_SPACE': return target.matrix_basis
+        if space == 'LOCAL_SPACE': return target.matrix_local
+        return target.matrix_world
+
+
+def transform_location(target: Union['Object', 'PoseBone'], space: Optional[str]='WORLD_SPACE') -> 'Vector':
+    return transform_matrix(target, space).to_translation()
+
+
+def transform_rotation(target: Union['Object', 'PoseBone'],
+                       mode: str,
+                       space: Optional[str]='WORLD_SPACE') -> Union['Quaternion', 'Euler']:
+    matrix = transform_matrix(target, space)
+    result = matrix.to_quaternion()
+    if mode == 'EULER': result = result.to_euler()
+    elif mode == 'SWING_TWIST_X': return quaternion_to_swing_twist_x(result, True)
+    elif mode == 'SWING_TWIST_Y': return quaternion_to_swing_twist_y(result, True)
+    elif mode == 'SWING_TWIST_Z': return quaternion_to_swing_twist_z(result, True)
+    return result
+
+
+def transform_scale(target: Union['Object', 'PoseBone'], space: Optional[str]='WORLD_SPACE') -> 'Vector':
+    return transform_matrix(target, space).to_scale()
 
 #endregion
 
@@ -591,8 +615,28 @@ def idprop_update(id_: 'ID', obj: Union[np.ndarray, np.void]) -> None:
                 val[x["index"]] = x["value"]
 
 
-def idprop_remove(id: 'ID', obj: Union[np.ndarray, np.void]) -> None:
-    pass
+def idprop_reindex(data: np.ndarray) -> None:
+    assert data.base is None
+    data["index"] = np.arange(data.size).reshape(data.shape)
+
+
+def idprop_move(data: np.ndarray,
+                from_index: int,
+                to_index: int,
+                id: Optional['ID']=None,
+                move_drivers: Optional[bool]=False) -> None:
+    value = None
+    if id:
+        value = idprop_read(id, data)
+    if value is None:
+        value = data["value"].tolist()
+    value.insert(to_index, value.pop(from_index))
+    data["value"] = value
+    idprop_reindex(data)
+    if id:
+        idprop_update(id, data)
+        if move_drivers:
+            idprop_drivers_move(id, data, from_index, to_index)
 
 
 def idprop_driver(id: 'ID',
@@ -618,6 +662,22 @@ def idprop_drivers(id: 'ID',
                    props: Union[Iterable[np.void], np.void],
                    **kwargs: Dict[str, Union[str, bool]]) -> List['FCurve']:
     return list(map(partial(idprop_driver, id, **kwargs), props))
+
+
+def idprop_drivers_move(id: 'ID', data: np.ndarray, from_index: int, to_index: int) -> None:
+    animdata = id.animation_data
+    if animdata:
+        a, b = from_index, to_index
+        if a > b: a, b = b, a
+        idx = list(range(a, b))
+        ref = idx.copy()
+        ref.append(ref.pop(0))
+        path = idprop_path(data)
+        for fc in animdata.drivers:
+            if fc.data_path == path:
+                i = fc.array_index
+                if i in idx:
+                    fc.array_index = ref[idx.index(i)]
 
 
 def idprop_variable(driver: 'Driver', object: 'Object', data: np.void) -> 'DriverVariable':

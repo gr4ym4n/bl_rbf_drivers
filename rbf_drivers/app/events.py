@@ -54,10 +54,13 @@ def throttle_event(event: Event, timespan: Optional[float]=0.1) -> None:
         timers.register(_throttle, first_interval=0.1)
 
 
-def dispatch_event(event: Event) -> None:
-    _queue.append(event)
-    if not _processing_queue:
-        _process_queue()
+def dispatch_event(event: Event, immediate: Optional[bool]=False) -> None:
+    if immediate:
+        _process_event(event)
+    else:
+        _queue.append(event)
+        if not _processing_queue:
+            _process_queue()
 
 
 def event_handler(*types: Tuple[Type[Event]]) -> Callable[[EventHandler], EventHandler]:

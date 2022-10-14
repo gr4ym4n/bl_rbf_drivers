@@ -11,7 +11,7 @@ from ..lib.rotation_utils import (quaternion_to_euler,
                                   quaternion_to_swing_twist_x,
                                   quaternion_to_swing_twist_y,
                                   quaternion_to_swing_twist_z)
-from ..api.inputs import (INPUT_ROTATION_AXIS_TABLE,
+from ..api.input import (INPUT_ROTATION_AXIS_TABLE,
                          INPUT_ROTATION_MODE_TABLE,
                          INPUT_ROTATION_ORDER_TABLE)
 from ..api.driver import DRIVER_TYPE_TABLE

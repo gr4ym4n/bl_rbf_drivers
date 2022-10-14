@@ -28,7 +28,7 @@ from ..api.input import (input_is_valid,
                          InputTypeUpdateEvent,
                          InputUseSwingUpdateEvent,
                          InputRotationModeChangeEvent)
-from ..api.inputs import InputNewEvent, InputRemovedEvent
+from ..api.input import InputNewEvent, InputRemovedEvent
 from ..api.pose_interpolation import PoseInterpolationUpdateEvent
 from ..api.pose import PoseUpdateEvent
 from ..api.poses import PoseMoveEvent, PoseNewEvent, PoseRemovedEvent
